@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
+import { HydratedDocument, Types } from 'mongoose';
+import { User } from '../../users/schemas/user.schema';
 
 export type ActivityDocument = HydratedDocument<Activity>;
 
@@ -23,11 +24,11 @@ export class Activity {
   @Prop({ default: 10 })
   plazas: number;
 
-  @Prop({ default: [] })
-  participantes: string[];
+  @Prop({ type: [{ type: Types.ObjectId, ref: User.name }], default: [] })
+  participantes: Types.ObjectId[];
 
-  @Prop()
-  creador: string;
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
+  creador: Types.ObjectId;
 }
 
 export const ActivitySchema = SchemaFactory.createForClass(Activity);

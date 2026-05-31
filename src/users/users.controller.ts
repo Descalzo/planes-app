@@ -1,11 +1,12 @@
 import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiParam, ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { LoginUserDto } from './dto/login-user.dto';
 import { AuthService } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { ParseObjectIdPipe } from '../common/pipes/parse-object-id.pipe';
 
 @ApiTags('users')
 @Controller('users')
@@ -34,7 +35,8 @@ export class UsersController {
   }
 
   @Get(':id')
-  findById(@Param('id') id: string) {
+  @ApiParam({ name: 'id', description: 'ID del usuario', type: String })
+  findById(@Param('id', ParseObjectIdPipe) id: string) {
     return this.usersService.findById(id);
   }
 }

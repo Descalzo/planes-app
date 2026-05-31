@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Activity, ActivityDocument } from './schemas/activity.schema';
 import { CreateActivityDto } from './dto/create-activity.dto';
 
@@ -8,10 +8,10 @@ import { CreateActivityDto } from './dto/create-activity.dto';
 export class ActivitiesService {
   constructor(@InjectModel(Activity.name) private activityModel: Model<ActivityDocument>) {}
 
-  async create(createActivityDto: CreateActivityDto, creador: string): Promise<Activity> {
+  async create(createActivityDto: CreateActivityDto, creadorId: string): Promise<Activity> {
     const newActivity = new this.activityModel({
       ...createActivityDto,
-      creador,
+      creador: new Types.ObjectId(creadorId),
     });
     return newActivity.save();
   }
@@ -28,25 +28,22 @@ export class ActivitiesService {
     return activity;
   }
 
-  async joinActivity(id: string, usuario: string): Promise<Activity> {
+  async joinActivity(id: string, usuarioId: string): Promise<Activity> {
     const activity = await this.activityModel.findById(id).exec();
 
     if (!activity) {
       throw new NotFoundException(`Actividad con ID ${id} no encontrada`);
     }
 
-    // Verificar si el usuario ya está apuntado
-    if (activity.participantes.includes(usuario)) {
+    if (activity.participantes.some((participante) => participante.toString() === usuarioId)) {
       throw new BadRequestException('El usuario ya está apuntado a esta actividad');
     }
 
-    // Verificar si hay plazas disponibles
     if (activity.participantes.length >= activity.plazas) {
       throw new BadRequestException('No hay plazas disponibles en esta actividad');
     }
 
-    // Añadir el usuario a los participantes
-    activity.participantes.push(usuario);
+    activity.participantes.push(new Types.ObjectId(usuarioId));
     return activity.save();
   }
 }

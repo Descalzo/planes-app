@@ -1,9 +1,10 @@
 import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiParam, ApiTags } from '@nestjs/swagger';
 import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { ParseObjectIdPipe } from '../common/pipes/parse-object-id.pipe';
 
 @ApiTags('messages')
 @Controller('activities/:activityId/messages')
@@ -13,8 +14,9 @@ export class MessagesController {
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT')
+  @ApiParam({ name: 'activityId', description: 'ID de la actividad', type: String })
   create(
-    @Param('activityId') activityId: string,
+    @Param('activityId', ParseObjectIdPipe) activityId: string,
     @CurrentUser() user: { id: string },
     @Body() createMessageDto: CreateMessageDto,
   ) {
@@ -22,7 +24,8 @@ export class MessagesController {
   }
 
   @Get()
-  findByActivity(@Param('activityId') activityId: string) {
+  @ApiParam({ name: 'activityId', description: 'ID de la actividad', type: String })
+  findByActivity(@Param('activityId', ParseObjectIdPipe) activityId: string) {
     return this.messagesService.findByActivity(activityId);
   }
 }
