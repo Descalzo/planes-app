@@ -2,6 +2,7 @@ import { api } from './api';
 
 export interface MessageAuthor {
   _id?: string;
+  id?: string;
   nombre?: string;
   ciudad?: string;
 }

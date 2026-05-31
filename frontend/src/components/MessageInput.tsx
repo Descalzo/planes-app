@@ -12,6 +12,9 @@ function getErrorMessage(error: unknown) {
     if (response?.status === 401) {
       return 'Debes iniciar sesion para enviar mensajes';
     }
+    if (response?.status === 403) {
+      return 'No tienes permiso para escribir en este chat';
+    }
 
     const message = response?.data?.message;
     return Array.isArray(message) ? message.join(', ') : message ?? 'No se pudo enviar el mensaje';
@@ -53,7 +56,7 @@ export default function MessageInput({ activityId, onSent }: MessageInputProps) 
         onChange={(event) => setText(event.target.value)}
       />
       {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={isSubmitting}>
+      <button className="button button--primary" type="submit" disabled={isSubmitting}>
         {isSubmitting ? 'Enviando...' : 'Enviar'}
       </button>
     </form>

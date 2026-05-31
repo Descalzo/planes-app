@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from '../pages/LoginPage';
 import RegisterPage from '../pages/RegisterPage';
 import ActivitiesPage from '../pages/ActivitiesPage';
+import MyActivitiesPage from '../pages/MyActivitiesPage';
 import CreateActivityPage from '../pages/CreateActivityPage';
 import ActivityDetailPage from '../pages/ActivityDetailPage';
 import ActivityChatPage from '../pages/ActivityChatPage';
@@ -26,6 +27,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <ActivitiesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/my-activities"
+        element={
+          <ProtectedRoute>
+            <MyActivitiesPage />
           </ProtectedRoute>
         }
       />

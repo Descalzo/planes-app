@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Message, MessageDocument } from './schemas/message.schema';
@@ -18,6 +18,18 @@ export class MessagesService {
     const activity = await this.activityModel.findById(activityId).exec();
     if (!activity) {
       throw new NotFoundException(`Actividad con ID ${activityId} no encontrada`);
+    }
+
+    const isCreator = activity.creador.toString() === userId;
+    const isParticipant = (activity.participantes ?? []).some((participante) => participante.toString() === userId);
+    const isMuted = (activity.chatSilenciados ?? []).some((user) => user.toString() === userId);
+
+    if (!isCreator && !isParticipant) {
+      throw new ForbiddenException('Debes estar apuntado a la actividad para escribir en el chat');
+    }
+
+    if (isMuted) {
+      throw new ForbiddenException('No tienes permiso para escribir en este chat');
     }
 
     const author = await this.userModel.findById(userId).exec();

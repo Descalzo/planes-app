@@ -36,4 +36,58 @@ export class ActivitiesController {
   joinActivity(@Param('id', ParseObjectIdPipe) id: string, @CurrentUser() user: { id: string }) {
     return this.activitiesService.joinActivity(id, user.id);
   }
+
+  @Patch(':id/leave')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiParam({ name: 'id', description: 'ID de la actividad', type: String })
+  leaveActivity(@Param('id', ParseObjectIdPipe) id: string, @CurrentUser() user: { id: string }) {
+    return this.activitiesService.leaveActivity(id, user.id);
+  }
+
+  @Patch(':id/participants/:participantId/remove')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiParam({ name: 'id', description: 'ID de la actividad', type: String })
+  @ApiParam({ name: 'participantId', description: 'ID del participante', type: String })
+  removeParticipant(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Param('participantId', ParseObjectIdPipe) participantId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.activitiesService.removeParticipant(id, participantId, user.id);
+  }
+
+  @Patch(':id/participants/:participantId/unban')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  unbanParticipant(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Param('participantId', ParseObjectIdPipe) participantId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.activitiesService.unbanParticipant(id, participantId, user.id);
+  }
+
+  @Patch(':id/participants/:participantId/mute')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  muteParticipant(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Param('participantId', ParseObjectIdPipe) participantId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.activitiesService.muteParticipant(id, participantId, user.id);
+  }
+
+  @Patch(':id/participants/:participantId/unmute')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  unmuteParticipant(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Param('participantId', ParseObjectIdPipe) participantId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.activitiesService.unmuteParticipant(id, participantId, user.id);
+  }
 }

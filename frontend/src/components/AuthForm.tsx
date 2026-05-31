@@ -66,7 +66,7 @@ export default function AuthForm({ type }: AuthFormProps) {
         </label>
       )}
       {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={isSubmitting}>
+      <button className="button button--primary" type="submit" disabled={isSubmitting}>
         {isSubmitting ? 'Enviando...' : type === 'login' ? 'Ingresar' : 'Crear cuenta'}
       </button>
     </form>

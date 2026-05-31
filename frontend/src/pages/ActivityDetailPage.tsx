@@ -1,6 +1,24 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Activity, fetchActivity, joinActivity } from '../services/activityService';
+import {
+  Activity,
+  fetchActivity,
+  getActivityParticipantsCount,
+  getReferenceId,
+  getReferenceName,
+  isActivityCreator,
+  isUserMutedInActivity,
+  isUserRemovedFromActivity,
+  isUserInActivity,
+  joinActivity,
+  leaveActivity,
+  muteActivityParticipant,
+  removeActivityParticipant,
+  unbanActivityParticipant,
+  unmuteActivityParticipant,
+} from '../services/activityService';
+import { CurrentUser, fetchCurrentUser } from '../services/authService';
+import { markActivitySeen } from '../services/notificationService';
 
 function getErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
@@ -19,8 +37,13 @@ function getErrorMessage(error: unknown) {
 export default function ActivityDetailPage() {
   const { activityId } = useParams();
   const [activity, setActivity] = useState<Activity | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isJoining, setIsJoining] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [removingParticipantId, setRemovingParticipantId] = useState<string | null>(null);
+  const [mutingParticipantId, setMutingParticipantId] = useState<string | null>(null);
+  const [unbanningParticipantId, setUnbanningParticipantId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -30,26 +53,51 @@ export default function ActivityDetailPage() {
       return;
     }
 
+    const currentActivityId = activityId;
     let isMounted = true;
-    fetchActivity(activityId)
-      .then((data) => {
+    let viewerId: string | null = null;
+
+    async function loadInitialData() {
+      try {
+        const [activityData, userData] = await Promise.all([fetchActivity(currentActivityId), fetchCurrentUser()]);
         if (isMounted) {
-          setActivity(data);
+          setActivity(activityData);
+          setCurrentUser(userData);
+          viewerId = userData._id ?? userData.id ?? null;
+          markActivitySeen(activityData._id, viewerId);
+          setError(null);
         }
-      })
-      .catch(() => {
+      } catch {
         if (isMounted) {
           setError('No se pudo cargar la actividad');
         }
-      })
-      .finally(() => {
+      } finally {
         if (isMounted) {
           setIsLoading(false);
         }
-      });
+      }
+    }
+
+    async function refreshActivity() {
+      try {
+        const activityData = await fetchActivity(currentActivityId);
+        if (isMounted) {
+          setActivity(activityData);
+          markActivitySeen(activityData._id, viewerId);
+        }
+      } catch {
+        if (isMounted) {
+          setError('No se pudo cargar la actividad');
+        }
+      }
+    }
+
+    loadInitialData();
+    const intervalId = window.setInterval(refreshActivity, 5000);
 
     return () => {
       isMounted = false;
+      window.clearInterval(intervalId);
     };
   }, [activityId]);
 
@@ -62,7 +110,19 @@ export default function ActivityDetailPage() {
     setIsJoining(true);
     try {
       const updatedActivity = await joinActivity(activityId);
-      setActivity(updatedActivity);
+      setActivity((currentActivity) => {
+        const userId = currentUser?._id ?? currentUser?.id;
+        const nextActivity = updatedActivity ?? currentActivity;
+
+        if (!nextActivity || !userId || isUserInActivity(nextActivity, userId)) {
+          return nextActivity;
+        }
+
+        return {
+          ...nextActivity,
+          participantes: [...(nextActivity.participantes ?? []), userId],
+        };
+      });
     } catch (caughtError) {
       setError(getErrorMessage(caughtError));
     } finally {
@@ -70,30 +130,239 @@ export default function ActivityDetailPage() {
     }
   }
 
-  const participants = activity?.participantes?.length ?? 0;
+  async function handleRemoveParticipant(participantId: string) {
+    if (!activityId) {
+      return;
+    }
+
+    setError(null);
+    setRemovingParticipantId(participantId);
+    try {
+      const updatedActivity = await removeActivityParticipant(activityId, participantId);
+      setActivity(updatedActivity);
+      markActivitySeen(updatedActivity._id, currentUserId);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError));
+    } finally {
+      setRemovingParticipantId(null);
+    }
+  }
+
+  async function handleLeave() {
+    if (!activityId) {
+      return;
+    }
+
+    setError(null);
+    setIsLeaving(true);
+    try {
+      const updatedActivity = await leaveActivity(activityId);
+      setActivity(updatedActivity);
+      markActivitySeen(updatedActivity._id, currentUserId);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError));
+    } finally {
+      setIsLeaving(false);
+    }
+  }
+
+  async function handleToggleMute(participantId: string, isMuted: boolean) {
+    if (!activityId) {
+      return;
+    }
+
+    setError(null);
+    setMutingParticipantId(participantId);
+    try {
+      const updatedActivity = isMuted
+        ? await unmuteActivityParticipant(activityId, participantId)
+        : await muteActivityParticipant(activityId, participantId);
+      setActivity(updatedActivity);
+      markActivitySeen(updatedActivity._id, currentUserId);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError));
+    } finally {
+      setMutingParticipantId(null);
+    }
+  }
+
+  async function handleUnban(participantId: string) {
+    if (!activityId) {
+      return;
+    }
+
+    setError(null);
+    setUnbanningParticipantId(participantId);
+    try {
+      const updatedActivity = await unbanActivityParticipant(activityId, participantId);
+      setActivity(updatedActivity);
+      markActivitySeen(updatedActivity._id, currentUserId);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError));
+    } finally {
+      setUnbanningParticipantId(null);
+    }
+  }
+
+  const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
+  const participants = activity ? getActivityParticipantsCount(activity, currentUserId) : 0;
   const availableSpots = typeof activity?.plazas === 'number' ? Math.max(activity.plazas - participants, 0) : null;
+  const isJoined = Boolean(activity && currentUserId && isUserInActivity(activity, currentUserId));
+  const isCreator = Boolean(activity && currentUserId && isActivityCreator(activity, currentUserId));
+  const isRemoved = Boolean(activity && currentUserId && isUserRemovedFromActivity(activity, currentUserId));
+  const visibleParticipants = activity
+    ? [activity.creador, ...(activity.participantes ?? [])].filter((participant, index, allParticipants) => {
+        const participantId = getReferenceId(participant);
+        return Boolean(participantId) && allParticipants.findIndex((item) => getReferenceId(item) === participantId) === index;
+      })
+    : [];
+  const usersWhoLeft = activity?.salidas ?? [];
+  const bannedUsers = activity?.expulsados ?? [];
 
   return (
     <main className="page page--detail">
       <header>
         <h1>{activity?.titulo ?? 'Detalle de actividad'}</h1>
-        {activityId && <Link to={`/activities/${activityId}/chat`}>Ir al chat</Link>}
       </header>
       <section>
         {isLoading && <p>Cargando actividad...</p>}
         {error && <p role="alert">{error}</p>}
         {activity && (
-          <>
-            <p>{activity.descripcion || 'Sin descripcion'}</p>
-            <p>Categoria: {activity.categoria || 'Sin categoria'}</p>
-            <p>Ciudad: {activity.ciudad || 'Sin ciudad'}</p>
-            {activity.fecha && <p>Fecha: {new Date(activity.fecha).toLocaleString()}</p>}
-            <p>Participantes: {participants}</p>
-            <p>{availableSpots === null ? 'Plazas no indicadas' : `Plazas disponibles: ${availableSpots}`}</p>
-            <button type="button" onClick={handleJoin} disabled={isJoining}>
-              {isJoining ? 'Uniendo...' : 'Unirse'}
-            </button>
-          </>
+          <div className="detail-card">
+            <p className="detail-card__description">{activity.descripcion || 'Sin descripcion'}</p>
+            <div className="detail-grid">
+              <p><span>Categoria</span>{activity.categoria || 'Sin categoria'}</p>
+              <p><span>Ciudad</span>{activity.ciudad || 'Sin ciudad'}</p>
+              {activity.fecha && <p><span>Fecha</span>{new Date(activity.fecha).toLocaleString()}</p>}
+              <p><span>Participantes</span>{participants}</p>
+              <p><span>Plazas</span>{availableSpots === null ? 'No indicadas' : availableSpots}</p>
+            </div>
+            {isCreator && (
+              <div className="participants-panel">
+                <h2>Participantes</h2>
+                <div className="participants-list">
+                  {visibleParticipants.map((participant) => {
+                    const participantId = getReferenceId(participant);
+                    const isCurrentCreator = participantId === currentUserId;
+                    const isMuted = Boolean(activity && participantId && isUserMutedInActivity(activity, participantId));
+
+                    if (!participantId) {
+                      return null;
+                    }
+
+                    return (
+                      <div className="participant-row" key={participantId}>
+                        <div>
+                          <strong>{getReferenceName(participant)}</strong>
+                          {isCurrentCreator && <span> Creador</span>}
+                          {isMuted && <span> Silenciado</span>}
+                        </div>
+                        {!isCurrentCreator && (
+                          <div className="participant-actions">
+                            <button
+                              className="button button--ghost button--small"
+                              type="button"
+                              disabled={mutingParticipantId === participantId}
+                              onClick={() => handleToggleMute(participantId, isMuted)}
+                            >
+                              {mutingParticipantId === participantId
+                                ? 'Guardando...'
+                                : isMuted
+                                  ? 'Permitir hablar'
+                                  : 'Silenciar chat'}
+                            </button>
+                            <button
+                              className="button button--ghost button--small"
+                              type="button"
+                              disabled={removingParticipantId === participantId}
+                              onClick={() => handleRemoveParticipant(participantId)}
+                            >
+                              {removingParticipantId === participantId ? 'Quitando...' : 'Quitar'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {usersWhoLeft.length > 0 && (
+                  <>
+                    <h2>Se desapuntaron</h2>
+                    <div className="participants-list">
+                      {usersWhoLeft.map((user) => {
+                        const userId = getReferenceId(user);
+                        if (!userId) {
+                          return null;
+                        }
+
+                        return (
+                          <div className="participant-row" key={userId}>
+                            <div>
+                              <strong>{getReferenceName(user)}</strong>
+                              <span> Se desapunto</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+                {bannedUsers.length > 0 && (
+                  <>
+                    <h2>Expulsados</h2>
+                    <div className="participants-list">
+                      {bannedUsers.map((user) => {
+                        const userId = getReferenceId(user);
+                        if (!userId) {
+                          return null;
+                        }
+
+                        return (
+                          <div className="participant-row" key={userId}>
+                            <div>
+                              <strong>{getReferenceName(user)}</strong>
+                              <span> No puede volver a unirse</span>
+                            </div>
+                            <button
+                              className="button button--ghost button--small"
+                              type="button"
+                              disabled={unbanningParticipantId === userId}
+                              onClick={() => handleUnban(userId)}
+                            >
+                              {unbanningParticipantId === userId ? 'Desbaneando...' : 'Desbanear'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            <div className="detail-actions">
+              {isRemoved ? (
+                <p className="status-pill status-pill--danger">Te han quitado de esta actividad</p>
+              ) : isJoined ? (
+                <>
+                  <p className="status-pill">Ya estas apuntado</p>
+                  {!isCreator && (
+                    <button className="button button--ghost" type="button" onClick={handleLeave} disabled={isLeaving}>
+                      {isLeaving ? 'Saliendo...' : 'Desapuntarme'}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button className="button button--primary" type="button" onClick={handleJoin} disabled={isJoining}>
+                  {isJoining ? 'Uniendo...' : 'Unirse'}
+                </button>
+              )}
+              {activityId && (
+                <Link className="button button--secondary" to={`/activities/${activityId}/chat`}>
+                  Ir al chat
+                </Link>
+              )}
+            </div>
+          </div>
         )}
       </section>
     </main>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ActivityCard from '../components/ActivityCard';
 import {
@@ -13,7 +13,7 @@ import { CurrentUser, fetchCurrentUser } from '../services/authService';
 import { fetchMessages } from '../services/messageService';
 import { hasActivityUpdates, hasUnreadMessages } from '../services/notificationService';
 
-export default function ActivitiesPage() {
+export default function MyActivitiesPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [unreadMessageActivityIds, setUnreadMessageActivityIds] = useState<Set<string>>(new Set());
@@ -34,7 +34,7 @@ export default function ActivitiesPage() {
         }
       } catch {
         if (isMounted) {
-          setError('No se pudieron cargar las actividades');
+          setError('No se pudieron cargar tus actividades');
         }
       } finally {
         if (isMounted) {
@@ -58,19 +58,27 @@ export default function ActivitiesPage() {
   }, []);
 
   const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
+  const myActivities = useMemo(
+    () =>
+      currentUserId
+        ? activities.filter(
+            (activity) => isUserInActivity(activity, currentUserId) || isUserRemovedFromActivity(activity, currentUserId),
+          )
+        : [],
+    [activities, currentUserId],
+  );
 
   useEffect(() => {
-    if (!currentUserId || activities.length === 0) {
+    if (!currentUserId || myActivities.length === 0) {
       setUnreadMessageActivityIds(new Set());
       return;
     }
 
     let isMounted = true;
-    const joinedActivities = activities.filter((activity) => isUserInActivity(activity, currentUserId));
 
     async function loadUnreadMessages() {
       const activityIds = await Promise.all(
-        joinedActivities.map(async (activity) => {
+        myActivities.map(async (activity) => {
           try {
             const messages = await fetchMessages(activity._id);
             return hasUnreadMessages(activity._id, messages, currentUserId) ? activity._id : null;
@@ -91,31 +99,34 @@ export default function ActivitiesPage() {
       isMounted = false;
       window.clearInterval(intervalId);
     };
-  }, [activities, currentUserId]);
+  }, [myActivities, currentUserId]);
 
   return (
     <main className="page page--activities">
       <header>
         <div>
-          <h1>Actividades</h1>
-          <p>Explora las actividades disponibles y unete a las que mas te interesen.</p>
+          <h1>Mis actividades</h1>
+          <p>Planes que has creado o a los que te has unido.</p>
         </div>
         <div className="page-actions">
-          <Link className="button button--secondary" to="/my-activities">Mis actividades</Link>
+          <Link className="button button--secondary" to="/activities">Ver actividades</Link>
           <Link className="button button--primary" to="/activities/new">Crear actividad</Link>
         </div>
       </header>
       <section className="activities-stack">
-        {isLoading && <p>Cargando actividades...</p>}
+        {isLoading && <p>Cargando tus actividades...</p>}
         {error && <p role="alert">{error}</p>}
         {!isLoading && !error && (
           <div className="section-heading">
-            <h2>Todas las actividades</h2>
+            <h2>Mis actividades</h2>
+            <span className="section-heading__badge">{myActivities.length}</span>
           </div>
         )}
-        {!isLoading && !error && activities.length === 0 && <p>No hay actividades todavia.</p>}
+        {!isLoading && !error && myActivities.length === 0 && (
+          <p>No tienes actividades creadas ni actividades a las que te hayas unido.</p>
+        )}
         <div className="activity-grid">
-          {activities.map((activity) => (
+          {myActivities.map((activity) => (
             <ActivityCard
               key={activity._id}
               id={activity._id}

@@ -10,9 +10,10 @@ body,
 }
 
 body {
-  background: #f7fafc;
+  background: #f6fbff;
   color: #1f2937;
   font-family: Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 a {

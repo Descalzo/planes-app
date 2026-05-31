@@ -77,7 +77,7 @@ export default function ActivityForm() {
         <input min="1" type="number" value={spots} onChange={(event) => setSpots(event.target.value)} />
       </label>
       {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={isSubmitting}>
+      <button className="button button--primary" type="submit" disabled={isSubmitting}>
         {isSubmitting ? 'Creando...' : 'Crear actividad'}
       </button>
     </form>

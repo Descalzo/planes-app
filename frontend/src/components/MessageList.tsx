@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchMessages, Message } from '../services/messageService';
+import { markChatSeen } from '../services/notificationService';
 
 interface MessageListProps {
   activityId: string;
   refreshKey: number;
+  currentUserId?: string | null;
 }
 
 function getAuthorName(message: Message) {
@@ -14,10 +16,11 @@ function getAuthorName(message: Message) {
   return 'Usuario';
 }
 
-export default function MessageList({ activityId, refreshKey }: MessageListProps) {
+export default function MessageList({ activityId, refreshKey, currentUserId }: MessageListProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const messagesBoxRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!activityId) {
@@ -29,27 +32,46 @@ export default function MessageList({ activityId, refreshKey }: MessageListProps
     setIsLoading(true);
     setError(null);
 
-    fetchMessages(activityId)
-      .then((data) => {
+    async function loadMessages(showLoading = false) {
+      if (showLoading) {
+        setIsLoading(true);
+      }
+
+      try {
+        const data = await fetchMessages(activityId);
         if (isMounted) {
           setMessages(data);
+          markChatSeen(activityId, currentUserId, data);
+          setError(null);
         }
-      })
-      .catch(() => {
+      } catch {
         if (isMounted) {
           setError('No se pudieron cargar los mensajes');
         }
-      })
-      .finally(() => {
+      } finally {
         if (isMounted) {
           setIsLoading(false);
         }
-      });
+      }
+    }
+
+    loadMessages(true);
+    const intervalId = window.setInterval(() => loadMessages(), 3000);
 
     return () => {
       isMounted = false;
+      window.clearInterval(intervalId);
     };
-  }, [activityId, refreshKey]);
+  }, [activityId, currentUserId, refreshKey]);
+
+  useEffect(() => {
+    const messagesBox = messagesBoxRef.current;
+    if (!messagesBox) {
+      return;
+    }
+
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+  }, [messages.length]);
 
   return (
     <section className="message-list">
@@ -57,12 +79,14 @@ export default function MessageList({ activityId, refreshKey }: MessageListProps
       {isLoading && <p>Cargando mensajes...</p>}
       {error && <p role="alert">{error}</p>}
       {!isLoading && !error && messages.length === 0 && <p>No hay mensajes todavia.</p>}
-      {messages.map((message) => (
-        <div className="message-card" key={message._id}>
-          <strong>{getAuthorName(message)}</strong>
-          <p>{message.text}</p>
-        </div>
-      ))}
+      <div className="message-list__box" ref={messagesBoxRef}>
+        {messages.map((message) => (
+          <div className="message-card" key={message._id}>
+            <strong>{getAuthorName(message)}</strong>
+            <p>{message.text}</p>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }

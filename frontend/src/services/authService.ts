@@ -19,6 +19,16 @@ export interface AuthResponse {
   user: Record<string, unknown>;
 }
 
+export interface CurrentUser {
+  _id: string;
+  id?: string;
+  email: string;
+  nombre: string;
+  ciudad?: string;
+  bio?: string;
+  intereses?: string[];
+}
+
 export function registerUser(payload: RegisterDto) {
   return api.post('/users', payload);
 }
@@ -27,8 +37,9 @@ export function loginUser(payload: LoginDto) {
   return api.post<AuthResponse>('/users/login', payload);
 }
 
-export function fetchCurrentUser() {
-  return api.get('/users/me');
+export async function fetchCurrentUser() {
+  const response = await api.get<CurrentUser>('/users/me');
+  return response.data;
 }
 
 export async function authenticate(payload: LoginDto) {

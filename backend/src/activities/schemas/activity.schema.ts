@@ -27,6 +27,15 @@ export class Activity {
   @Prop({ type: [{ type: Types.ObjectId, ref: User.name }], default: [] })
   participantes: Types.ObjectId[];
 
+  @Prop({ type: [{ type: Types.ObjectId, ref: User.name }], default: [] })
+  expulsados: Types.ObjectId[];
+
+  @Prop({ type: [{ type: Types.ObjectId, ref: User.name }], default: [] })
+  salidas: Types.ObjectId[];
+
+  @Prop({ type: [{ type: Types.ObjectId, ref: User.name }], default: [] })
+  chatSilenciados: Types.ObjectId[];
+
   @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   creador: Types.ObjectId;
 }
