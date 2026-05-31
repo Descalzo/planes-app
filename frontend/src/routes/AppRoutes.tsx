@@ -5,17 +5,54 @@ import ActivitiesPage from '../pages/ActivitiesPage';
 import CreateActivityPage from '../pages/CreateActivityPage';
 import ActivityDetailPage from '../pages/ActivityDetailPage';
 import ActivityChatPage from '../pages/ActivityChatPage';
+import { getAuthToken } from '../services/api';
+
+function ProtectedRoute({ children }: { children: JSX.Element }) {
+  if (!getAuthToken()) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
 
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/activities" replace />} />
+      <Route path="/" element={<Navigate to={getAuthToken() ? '/activities' : '/login'} replace />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
-      <Route path="/activities" element={<ActivitiesPage />} />
-      <Route path="/activities/new" element={<CreateActivityPage />} />
-      <Route path="/activities/:activityId" element={<ActivityDetailPage />} />
-      <Route path="/activities/:activityId/chat" element={<ActivityChatPage />} />
+      <Route
+        path="/activities"
+        element={
+          <ProtectedRoute>
+            <ActivitiesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activities/new"
+        element={
+          <ProtectedRoute>
+            <CreateActivityPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activities/:activityId"
+        element={
+          <ProtectedRoute>
+            <ActivityDetailPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activities/:activityId/chat"
+        element={
+          <ProtectedRoute>
+            <ActivityChatPage />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 }
