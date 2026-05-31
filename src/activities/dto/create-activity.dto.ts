@@ -18,7 +18,4 @@ export class CreateActivityDto {
 
   @ApiPropertyOptional({ example: 8 })
   plazas?: number;
-
-  @ApiPropertyOptional({ example: 'Juan Perez' })
-  creador?: string;
 }
