@@ -1,0 +1,4 @@
+descalzo2012_db_user     QD3VH6Uyhru4mB1m
+
+mongodb+srv://descalzo2012_db_user:QD3VH6Uyhru4mB1m@cluster0.eiibmw8.mongodb.net/?appName=Cluster0
+
