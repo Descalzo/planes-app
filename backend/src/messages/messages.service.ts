@@ -20,13 +20,7 @@ export class MessagesService {
       throw new NotFoundException(`Actividad con ID ${activityId} no encontrada`);
     }
 
-    const isCreator = activity.creador.toString() === userId;
-    const isParticipant = (activity.participantes ?? []).some((participante) => participante.toString() === userId);
     const isMuted = (activity.chatSilenciados ?? []).some((user) => user.toString() === userId);
-
-    if (!isCreator && !isParticipant) {
-      throw new ForbiddenException('Debes estar apuntado a la actividad para escribir en el chat');
-    }
 
     if (isMuted) {
       throw new ForbiddenException('No tienes permiso para escribir en este chat');

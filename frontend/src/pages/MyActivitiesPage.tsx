@@ -13,10 +13,19 @@ import { CurrentUser, fetchCurrentUser } from '../services/authService';
 import { fetchMessages } from '../services/messageService';
 import { hasActivityUpdates, hasUnreadMessages } from '../services/notificationService';
 
+type View = 'todas' | 'creadas' | 'unidas';
+
+const VIEW_LABELS: Record<View, string> = {
+  todas:   'Todas',
+  creadas: 'Creadas por mí',
+  unidas:  'A las que me uní',
+};
+
 export default function MyActivitiesPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [unreadMessageActivityIds, setUnreadMessageActivityIds] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<View>('todas');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,9 +55,7 @@ export default function MyActivitiesPage() {
 
     loadPageData();
     const intervalId = window.setInterval(() => {
-      if (!isFirstLoad) {
-        loadPageData();
-      }
+      if (!isFirstLoad) loadPageData();
     }, 8000);
 
     return () => {
@@ -58,15 +65,23 @@ export default function MyActivitiesPage() {
   }, []);
 
   const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
+
   const myActivities = useMemo(
     () =>
       currentUserId
         ? activities.filter(
-            (activity) => isUserInActivity(activity, currentUserId) || isUserRemovedFromActivity(activity, currentUserId),
+            (a) => isUserInActivity(a, currentUserId) || isUserRemovedFromActivity(a, currentUserId),
           )
         : [],
     [activities, currentUserId],
   );
+
+  const visibleActivities = useMemo(() => {
+    if (!currentUserId) return [];
+    if (view === 'creadas') return myActivities.filter((a) => isActivityCreator(a, currentUserId));
+    if (view === 'unidas')  return myActivities.filter((a) => !isActivityCreator(a, currentUserId));
+    return myActivities;
+  }, [myActivities, currentUserId, view]);
 
   useEffect(() => {
     if (!currentUserId || myActivities.length === 0) {
@@ -101,6 +116,12 @@ export default function MyActivitiesPage() {
     };
   }, [myActivities, currentUserId]);
 
+  const emptyMessages: Record<View, string> = {
+    todas:   'No tienes actividades creadas ni a las que te hayas unido.',
+    creadas: 'No has creado ninguna actividad todavia.',
+    unidas:  'No te has unido a ninguna actividad todavia.',
+  };
+
   return (
     <main className="page page--activities">
       <header>
@@ -109,7 +130,7 @@ export default function MyActivitiesPage() {
           <p>Planes que has creado o a los que te has unido.</p>
         </div>
         <div className="page-actions">
-          <Link className="button button--secondary" to="/activities">Ver actividades</Link>
+          <Link className="button button--secondary" to="/activities">Explorar</Link>
           <Link className="button button--primary" to="/activities/new">Crear actividad</Link>
         </div>
       </header>
@@ -117,16 +138,30 @@ export default function MyActivitiesPage() {
         {isLoading && <p>Cargando tus actividades...</p>}
         {error && <p role="alert">{error}</p>}
         {!isLoading && !error && (
-          <div className="section-heading">
-            <h2>Mis actividades</h2>
-            <span className="section-heading__badge">{myActivities.length}</span>
-          </div>
+          <>
+            <div className="category-filter">
+              {(Object.keys(VIEW_LABELS) as View[]).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  className={`category-filter__chip${view === v ? ' category-filter__chip--active' : ''}`}
+                  onClick={() => setView(v)}
+                >
+                  {VIEW_LABELS[v]}
+                </button>
+              ))}
+            </div>
+            <div className="section-heading">
+              <h2>{VIEW_LABELS[view]}</h2>
+              <span className="section-heading__badge">{visibleActivities.length}</span>
+            </div>
+          </>
         )}
-        {!isLoading && !error && myActivities.length === 0 && (
-          <p>No tienes actividades creadas ni actividades a las que te hayas unido.</p>
+        {!isLoading && !error && visibleActivities.length === 0 && (
+          <p>{emptyMessages[view]}</p>
         )}
         <div className="activity-grid">
-          {myActivities.map((activity) => (
+          {visibleActivities.map((activity) => (
             <ActivityCard
               key={activity._id}
               id={activity._id}
@@ -134,8 +169,10 @@ export default function MyActivitiesPage() {
               category={activity.categoria}
               city={activity.ciudad}
               spots={activity.plazas}
+              imagenUrl={activity.imagenUrl}
               participants={getActivityParticipantsCount(activity, currentUserId)}
               isJoined={Boolean(currentUserId && isUserInActivity(activity, currentUserId))}
+              isCreator={Boolean(currentUserId && isActivityCreator(activity, currentUserId))}
               isRemoved={Boolean(currentUserId && isUserRemovedFromActivity(activity, currentUserId))}
               hasActivityUpdates={Boolean(currentUserId && isActivityCreator(activity, currentUserId) && hasActivityUpdates(activity, currentUserId))}
               hasUnreadMessages={unreadMessageActivityIds.has(activity._id)}

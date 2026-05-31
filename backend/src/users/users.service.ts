@@ -105,8 +105,13 @@ export class UsersService {
       throw new NotFoundException(`Usuario con ID ${userId} no encontrado`);
     }
 
-    // Si no hay activityId, no se puede ver el perfil (a menos que sea la misma persona)
-    if (!activityId) {
+    // Si no hay activityId (o llega el string literal "undefined"/"null"), tratar como ausente
+    const validActivityId =
+      activityId && activityId !== 'undefined' && activityId !== 'null' && Types.ObjectId.isValid(activityId)
+        ? activityId
+        : null;
+
+    if (!validActivityId) {
       if (requesterId && requesterId === userId) {
         return user.toObject();
       }
@@ -114,7 +119,7 @@ export class UsersService {
     }
 
     // Validar que la actividad existe
-    const activity = await this.activityModel.findById(activityId).exec();
+    const activity = await this.activityModel.findById(validActivityId).exec();
     if (!activity) {
       throw new NotFoundException(`Actividad con ID ${activityId} no encontrada`);
     }

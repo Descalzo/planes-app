@@ -165,8 +165,10 @@ export default function ActivitiesPage() {
               category={activity.categoria}
               city={activity.ciudad}
               spots={activity.plazas}
+              imagenUrl={activity.imagenUrl}
               participants={getActivityParticipantsCount(activity, currentUserId)}
               isJoined={Boolean(currentUserId && isUserInActivity(activity, currentUserId))}
+              isCreator={Boolean(currentUserId && isActivityCreator(activity, currentUserId))}
               isRemoved={Boolean(currentUserId && isUserRemovedFromActivity(activity, currentUserId))}
               hasActivityUpdates={Boolean(currentUserId && isActivityCreator(activity, currentUserId) && hasActivityUpdates(activity, currentUserId))}
               hasUnreadMessages={unreadMessageActivityIds.has(activity._id)}

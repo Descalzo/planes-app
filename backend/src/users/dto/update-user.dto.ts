@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min } from 'class-validator';
+import { IsArray, IsInt, IsOptional, IsString, IsUrl, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({ example: 'Juan Perez' })
@@ -26,7 +26,7 @@ export class UpdateProfileDto {
 
   @ApiPropertyOptional({ example: 'https://example.com/foto.jpg' })
   @IsUrl({}, { message: 'fotoPerfilUrl debe ser una URL valida' })
-  @IsOptional()
+  @ValidateIf((o) => !!o.fotoPerfilUrl)
   fotoPerfilUrl?: string;
 
   @ApiPropertyOptional({ example: 28 })

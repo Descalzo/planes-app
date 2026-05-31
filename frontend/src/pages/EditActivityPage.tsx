@@ -1,20 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fetchActivity, updateActivity } from '../services/activityService';
-
-const CATEGORIES = [
-  'Deporte y aire libre',
-  'Ocio y social',
-  'Conocer gente',
-  'Gastronomía',
-  'Cultura',
-  'Aficiones',
-  'Viajes y escapadas',
-  'Formación',
-  'Familia',
-  'Voluntariado',
-  'Otros',
-];
+import { CATEGORIES } from '../utils/activityImages';
 
 function getErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
@@ -44,6 +31,7 @@ export default function EditActivityPage() {
   const [city, setCity] = useState('');
   const [date, setDate] = useState('');
   const [spots, setSpots] = useState('');
+  const [imagenUrl, setImagenUrl] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +46,7 @@ export default function EditActivityPage() {
         setCity(activity.ciudad ?? '');
         setDate(toLocalDatetime(activity.fecha));
         setSpots(activity.plazas ? String(activity.plazas) : '');
+        setImagenUrl(activity.imagenUrl ?? '');
       })
       .catch(() => setError('No se pudo cargar la actividad'))
       .finally(() => setIsLoading(false));
@@ -76,6 +65,7 @@ export default function EditActivityPage() {
         ciudad: city || undefined,
         fecha: date ? new Date(date).toISOString() : undefined,
         plazas: spots ? Number(spots) : undefined,
+        imagenUrl: imagenUrl || undefined,
       });
       navigate(`/activities/${activityId}`);
     } catch (caughtError) {
@@ -107,9 +97,7 @@ export default function EditActivityPage() {
           Categoria
           <select value={category} onChange={(e) => setCategory(e.target.value)}>
             <option value="">Sin categoría</option>
-            {CATEGORIES.map((cat) => (
-              <option key={cat}>{cat}</option>
-            ))}
+            {CATEGORIES.map((cat) => <option key={cat}>{cat}</option>)}
           </select>
         </label>
         <label>
@@ -124,8 +112,26 @@ export default function EditActivityPage() {
           Plazas
           <input min="1" type="number" value={spots} onChange={(e) => setSpots(e.target.value)} />
         </label>
+        <label>
+          Imagen (URL)
+          <input
+            type="url"
+            value={imagenUrl}
+            onChange={(e) => setImagenUrl(e.target.value)}
+            placeholder="https://example.com/imagen.jpg"
+          />
+        </label>
+        {imagenUrl && (
+          <div className="image-preview">
+            <img
+              src={imagenUrl}
+              alt="Preview"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          </div>
+        )}
         {error && <p role="alert">{error}</p>}
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div className="form-actions">
           <button
             className="button button--ghost"
             type="button"

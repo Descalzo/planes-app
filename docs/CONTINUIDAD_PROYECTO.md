@@ -74,16 +74,21 @@ planes/
 - `ciudad`: opcional.
 - `bio`: opcional.
 - `intereses`: array opcional.
+- `fotoPerfilUrl`: opcional, URL de foto de perfil.
+- `edad`: opcional.
+- `genero`: opcional.
+- `instagram`: opcional.
 - timestamps.
 
 #### Activity
 
 - `titulo`: requerido.
 - `descripcion`: opcional.
-- `categoria`: opcional.
+- `categoria`: opcional, valor libre pero la UI ofrece 11 categorias predefinidas.
 - `ciudad`: opcional.
 - `fecha`: `Date`.
 - `plazas`: numero, default 10.
+- `imagenUrl`: opcional, URL de imagen principal de la actividad.
 - `participantes`: array de `User`.
 - `expulsados`: array de `User`, bloquea reingreso hasta desbaneo.
 - `salidas`: array de `User`, usuarios que se desapuntaron voluntariamente.
@@ -102,7 +107,8 @@ planes/
 
 - `CreateUserDto`: `email`, `nombre`, `contraseña`, `ciudad?`, `bio?`, `intereses?`.
 - `LoginUserDto`: `email`, `contraseña`.
-- `CreateActivityDto`: `titulo`, `descripcion?`, `categoria?`, `ciudad?`, `fecha?`, `plazas?`.
+- `CreateActivityDto`: `titulo`, `descripcion?`, `categoria?`, `ciudad?`, `fecha?`, `plazas?`, `imagenUrl?` (URL validada si viene informada).
+- `UpdateActivityDto`: extiende `CreateActivityDto` con todos los campos opcionales.
 - `CreateMessageDto`: `text`.
 - `JoinActivityDto` existe en el repo historicamente, pero el flujo actual de join no usa body.
 
@@ -122,6 +128,7 @@ Nota: hay archivos con mojibake en la palabra `contraseÃ±a`. El flujo funciona
 - `GET /activities`
 - `POST /activities`
 - `GET /activities/:id`
+- `PATCH /activities/:id` (editar, solo creador)
 - `PATCH /activities/:id/join`
 - `PATCH /activities/:id/leave`
 - `PATCH /activities/:id/participants/:participantId/remove`
@@ -259,6 +266,18 @@ Con JWT:
 - `Activity.chatSilenciados[]` -> `User`
 - `Message.activity` -> `Activity`
 - `Message.author` -> `User`
+
+## Imagenes por URL
+
+Las imagenes se gestionan mediante URLs externas. No hay subida de archivos todavia.
+
+- **Foto de perfil** (`fotoPerfilUrl`): campo URL en `ProfilePage`. Preview circular con iniciales como fallback.
+- **Imagen de actividad** (`imagenUrl`): campo URL en crear y editar actividad. Preview en el formulario.
+  - En cards de actividades: imagen en la cabecera. Sin imagen → placeholder de color con emoji segun categoria.
+  - En detalle de actividad: imagen grande al inicio del card.
+  - En perfil publico: foto de perfil o avatar con iniciales si no hay foto.
+- Categorias predefinidas con color y emoji asignado en `frontend/src/utils/activityImages.ts`.
+- Pendiente: subida real de archivos con Cloudinary/S3 u otro proveedor.
 
 ## Funcionalidades ya terminadas
 

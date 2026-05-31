@@ -19,6 +19,7 @@ import {
 } from '../services/activityService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
 import { markActivitySeen } from '../services/notificationService';
+import { getCategoryVisual } from '../utils/activityImages';
 
 function getErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
@@ -229,6 +230,25 @@ export default function ActivityDetailPage() {
         {error && <p role="alert">{error}</p>}
         {activity && (
           <div className="detail-card">
+            {(() => {
+              const visual = getCategoryVisual(activity.categoria);
+              return activity.imagenUrl ? (
+                <img
+                  className="detail-card__image"
+                  src={activity.imagenUrl}
+                  alt={activity.titulo}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
+              ) : (
+                <div
+                  className="detail-card__image detail-card__image--placeholder"
+                  style={{ background: visual.gradient }}
+                  aria-hidden="true"
+                >
+                  <span>{visual.emoji}</span>
+                </div>
+              );
+            })()}
             <p className="detail-card__description">{activity.descripcion || 'Sin descripcion'}</p>
             <div className="detail-grid">
               <p><span>Categoria</span>{activity.categoria || 'Sin categoria'}</p>

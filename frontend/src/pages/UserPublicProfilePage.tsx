@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { fetchUserPublicProfile, CurrentUser } from '../services/authService';
 
+function getInitials(name?: string) {
+  if (!name) return 'U';
+  return name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || 'U';
+}
+
 export default function UserPublicProfilePage() {
   const navigate = useNavigate();
   const { userId } = useParams();
@@ -17,7 +22,8 @@ export default function UserPublicProfilePage() {
       return;
     }
 
-    const activityId = searchParams.get('activityId') || undefined;
+    const raw = searchParams.get('activityId');
+    const activityId = raw && raw !== 'undefined' && raw !== 'null' ? raw : undefined;
 
     async function loadProfile() {
       try {
@@ -52,8 +58,12 @@ export default function UserPublicProfilePage() {
         {error && <p role="alert">{error}</p>}
         {profile && (
           <div className="profile-card">
-            {profile.fotoPerfilUrl && (
+            {profile.fotoPerfilUrl ? (
               <img src={profile.fotoPerfilUrl} alt={profile.nombre} className="profile-card__photo" />
+            ) : (
+              <div className="profile-card__avatar" aria-hidden="true">
+                <span>{getInitials(profile.nombre)}</span>
+              </div>
             )}
             <div className="profile-card__info">
               <h2>{profile.nombre}</h2>

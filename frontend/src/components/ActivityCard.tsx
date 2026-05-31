@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { getCategoryVisual } from '../utils/activityImages';
 
 interface ActivityCardProps {
   id: string;
@@ -7,7 +8,9 @@ interface ActivityCardProps {
   city?: string;
   spots?: number;
   participants?: number;
+  imagenUrl?: string;
   isJoined?: boolean;
+  isCreator?: boolean;
   isRemoved?: boolean;
   hasActivityUpdates?: boolean;
   hasUnreadMessages?: boolean;
@@ -21,7 +24,9 @@ export default function ActivityCard({
   city,
   spots,
   participants = 0,
+  imagenUrl,
   isJoined = false,
+  isCreator = false,
   isRemoved = false,
   hasActivityUpdates = false,
   hasUnreadMessages = false,
@@ -34,12 +39,35 @@ export default function ActivityCard({
       ? 'activity-card activity-card--joined'
       : 'activity-card';
 
+  const visual = getCategoryVisual(category);
+
   return (
     <article className={cardClassName}>
+      {imagenUrl ? (
+        <img
+          className="activity-card__image"
+          src={imagenUrl}
+          alt={title}
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = 'none';
+          }}
+        />
+      ) : (
+        <div
+          className="activity-card__image activity-card__image--placeholder"
+          style={{ background: visual.gradient }}
+          aria-hidden="true"
+        >
+          <span>{visual.emoji}</span>
+        </div>
+      )}
       <div className="activity-card__content">
         <div className="activity-card__topline">
           <p className="activity-card__meta">{[category, city].filter(Boolean).join(' · ') || 'Sin categoria'}</p>
-          {isJoined && <span className="activity-card__badge">Ya unido</span>}
+          {isCreator
+            ? <span className="activity-card__badge activity-card__badge--creator">Creada por ti</span>
+            : isJoined && <span className="activity-card__badge">Ya unido</span>
+          }
           {isRemoved && <span className="activity-card__badge activity-card__badge--removed">Te han quitado</span>}
         </div>
         {(isRemoved || hasActivityUpdates || hasUnreadMessages || leftUsersCount > 0) && (
@@ -57,9 +85,11 @@ export default function ActivityCard({
             : `${participants} participantes · ${availableSpots} plazas disponibles`}
         </p>
       </div>
-      <Link className="button button--secondary" to={`/activities/${id}`}>
-        Ver actividad
-      </Link>
+      <div className="activity-card__footer">
+        <Link className="button button--secondary" to={`/activities/${id}`}>
+          Ver actividad
+        </Link>
+      </div>
     </article>
   );
 }

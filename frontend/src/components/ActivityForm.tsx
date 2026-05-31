@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createActivity } from '../services/activityService';
+import { CATEGORIES } from '../utils/activityImages';
 
 function getErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
@@ -8,11 +9,9 @@ function getErrorMessage(error: unknown) {
     if (response?.status === 401) {
       return 'Debes iniciar sesion para crear actividades';
     }
-
     const message = response?.data?.message;
     return Array.isArray(message) ? message.join(', ') : message ?? 'No se pudo crear la actividad';
   }
-
   return 'No se pudo crear la actividad';
 }
 
@@ -24,6 +23,7 @@ export default function ActivityForm() {
   const [city, setCity] = useState('');
   const [date, setDate] = useState('');
   const [spots, setSpots] = useState('10');
+  const [imagenUrl, setImagenUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +31,6 @@ export default function ActivityForm() {
     event.preventDefault();
     setError(null);
     setIsSubmitting(true);
-
     try {
       const activity = await createActivity({
         titulo: title,
@@ -40,8 +39,8 @@ export default function ActivityForm() {
         ciudad: city || undefined,
         fecha: date ? new Date(date).toISOString() : undefined,
         plazas: spots ? Number(spots) : undefined,
+        imagenUrl: imagenUrl || undefined,
       });
-
       navigate(`/activities/${activity._id}`);
     } catch (caughtError) {
       setError(getErrorMessage(caughtError));
@@ -54,41 +53,49 @@ export default function ActivityForm() {
     <form className="activity-form" onSubmit={handleSubmit}>
       <label>
         Titulo
-        <input value={title} onChange={(event) => setTitle(event.target.value)} required />
+        <input value={title} onChange={(e) => setTitle(e.target.value)} required />
       </label>
       <label>
         Descripcion
-        <textarea value={description} onChange={(event) => setDescription(event.target.value)} />
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
       </label>
       <label>
         Categoria
-        <select value={category} onChange={(event) => setCategory(event.target.value)}>
+        <select value={category} onChange={(e) => setCategory(e.target.value)}>
           <option value="">Sin categoría</option>
-          <option>Deporte y aire libre</option>
-          <option>Ocio y social</option>
-          <option>Conocer gente</option>
-          <option>Gastronomía</option>
-          <option>Cultura</option>
-          <option>Aficiones</option>
-          <option>Viajes y escapadas</option>
-          <option>Formación</option>
-          <option>Familia</option>
-          <option>Voluntariado</option>
-          <option>Otros</option>
+          {CATEGORIES.map((cat) => <option key={cat}>{cat}</option>)}
         </select>
       </label>
       <label>
         Ciudad
-        <input value={city} onChange={(event) => setCity(event.target.value)} />
+        <input value={city} onChange={(e) => setCity(e.target.value)} />
       </label>
       <label>
         Fecha
-        <input type="datetime-local" value={date} onChange={(event) => setDate(event.target.value)} />
+        <input type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} />
       </label>
       <label>
         Plazas
-        <input min="1" type="number" value={spots} onChange={(event) => setSpots(event.target.value)} />
+        <input min="1" type="number" value={spots} onChange={(e) => setSpots(e.target.value)} />
       </label>
+      <label>
+        Imagen (URL)
+        <input
+          type="url"
+          value={imagenUrl}
+          onChange={(e) => setImagenUrl(e.target.value)}
+          placeholder="https://example.com/imagen.jpg"
+        />
+      </label>
+      {imagenUrl && (
+        <div className="image-preview">
+          <img
+            src={imagenUrl}
+            alt="Preview"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          />
+        </div>
+      )}
       {error && <p role="alert">{error}</p>}
       <button className="button button--primary" type="submit" disabled={isSubmitting}>
         {isSubmitting ? 'Creando...' : 'Crear actividad'}

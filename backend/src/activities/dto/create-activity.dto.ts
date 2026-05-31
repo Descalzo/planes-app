@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
+import { IsDateString, IsInt, IsNotEmpty, IsOptional, IsString, IsUrl, Min, ValidateIf } from 'class-validator';
 
 export class CreateActivityDto {
   @ApiProperty({ example: 'Ruta en la Sierra' })
@@ -32,4 +32,9 @@ export class CreateActivityDto {
   @Min(1)
   @IsOptional()
   plazas?: number;
+
+  @ApiPropertyOptional({ example: 'https://example.com/imagen.jpg' })
+  @IsUrl({}, { message: 'Debe ser una URL válida' })
+  @ValidateIf((o) => !!o.imagenUrl)
+  imagenUrl?: string;
 }

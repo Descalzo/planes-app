@@ -96,13 +96,14 @@ export class ActivitiesService {
       throw new ForbiddenException('Solo el creador puede editar esta actividad');
     }
 
-    const { titulo, descripcion, categoria, ciudad, fecha, plazas } = dto;
+    const { titulo, descripcion, categoria, ciudad, fecha, plazas, imagenUrl } = dto;
     if (titulo !== undefined) activity.titulo = titulo;
     if (descripcion !== undefined) activity.descripcion = descripcion;
     if (categoria !== undefined) activity.categoria = categoria;
     if (ciudad !== undefined) activity.ciudad = ciudad;
     if (fecha !== undefined) activity.fecha = new Date(fecha);
     if (plazas !== undefined) activity.plazas = plazas;
+    if (imagenUrl !== undefined) activity.imagenUrl = imagenUrl;
 
     await activity.save();
     const [hydrated] = await this.hydrateActivities([activity]);

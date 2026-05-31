@@ -10,6 +10,7 @@ export interface Activity {
   ciudad?: string;
   fecha?: string;
   plazas?: number;
+  imagenUrl?: string;
   participantes?: EntityReference[];
   expulsados?: EntityReference[];
   salidas?: EntityReference[];
@@ -26,6 +27,7 @@ export interface ActivityCreateDto {
   ciudad?: string;
   fecha?: string;
   plazas?: number;
+  imagenUrl?: string;
 }
 
 export interface ActivityUpdateDto {
@@ -35,6 +37,7 @@ export interface ActivityUpdateDto {
   ciudad?: string;
   fecha?: string;
   plazas?: number;
+  imagenUrl?: string;
 }
 
 export async function fetchActivities() {
