@@ -1,0 +1,46 @@
+import { api, setAuthToken } from './api';
+
+export interface RegisterDto {
+  email: string;
+  nombre: string;
+  'contraseña': string;
+  ciudad?: string;
+  bio?: string;
+  intereses?: string[];
+}
+
+export interface LoginDto {
+  email: string;
+  'contraseña': string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  user: Record<string, unknown>;
+}
+
+export function registerUser(payload: RegisterDto) {
+  return api.post('/users', payload);
+}
+
+export function loginUser(payload: LoginDto) {
+  return api.post<AuthResponse>('/users/login', payload);
+}
+
+export function fetchCurrentUser() {
+  return api.get('/users/me');
+}
+
+export async function authenticate(payload: LoginDto) {
+  const response = await loginUser(payload);
+  setAuthToken(response.data.access_token);
+  return response.data;
+}
+
+export async function registerAndAuthenticate(payload: RegisterDto) {
+  await registerUser(payload);
+  return authenticate({
+    email: payload.email,
+    'contraseña': payload['contraseña'],
+  });
+}
