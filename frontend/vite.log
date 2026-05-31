@@ -8,3 +8,77 @@ Port 4174 is in use, trying another one...
   [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m209[22m[2m[0m ms[22m
 
   [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m4175[22m/[39m
+[2m20:21:38[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx[22m
+[2m20:21:48[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/routes/AppRoutes.tsx[22m
+[2m20:35:05[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivitiesPage.tsx, /src/pages/ActivityDetailPage.tsx, /src/components/ActivityForm.tsx[22m
+[2m20:35:09[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/AuthForm.tsx[22m
+[2m20:35:27[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityDetailPage.tsx[22m
+[2m20:35:38[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityDetailPage.tsx[22m
+[2m20:35:52[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivitiesPage.tsx[22m
+[2m20:39:41[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Navigation.tsx[22m
+[2m20:39:56[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ActivityCard.tsx[22m
+[2m20:40:12[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivitiesPage.tsx[22m
+[2m20:40:51[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityDetailPage.tsx[22m
+[2m20:40:56[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MessageList.tsx[22m
+[2m20:41:00[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MessageInput.tsx[22m
+[2m20:41:03[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ActivityForm.tsx[22m
+[2m20:41:08[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/AuthForm.tsx[22m
+[2m20:42:00[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.css[22m
+[2m20:42:03[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m20:45:16[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Navigation.tsx[22m
+[2m20:46:06[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/main.tsx[22m
+[2m20:48:54[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivitiesPage.tsx, /src/pages/ActivityDetailPage.tsx, /src/components/ActivityForm.tsx[22m
+[2m20:49:01[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityDetailPage.tsx[22m
+[2m20:49:07[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ActivityCard.tsx[22m
+[2m20:49:15[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivitiesPage.tsx[22m
+[2m20:51:01[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivitiesPage.tsx[22m
+[2m20:51:22[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/routes/AppRoutes.tsx[22m
+[2m20:51:26[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Navigation.tsx[22m
+[2m20:51:30[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.css[22m
+[2m20:52:26[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityChatPage.tsx[22m
+[2m20:54:00[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ActivityCard.tsx[22m
+[2m20:54:05[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivitiesPage.tsx[22m
+[2m20:54:08[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyActivitiesPage.tsx[22m
+[2m20:54:16[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.css[22m
+[2m21:02:02[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivitiesPage.tsx, /src/pages/ActivityDetailPage.tsx, /src/components/ActivityForm.tsx, /src/pages/MyActivitiesPage.tsx[22m
+[2m21:02:19[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ActivityCard.tsx[22m
+[2m21:02:22[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MessageList.tsx, /src/components/MessageInput.tsx[22m
+[2m21:02:38[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityDetailPage.tsx[22m
+[2m21:02:55[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivitiesPage.tsx[22m
+[2m21:03:07[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyActivitiesPage.tsx[22m
+[2m21:03:14[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyActivitiesPage.tsx[22m
+[2m21:03:20[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityChatPage.tsx[22m
+[2m21:03:29[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityDetailPage.tsx[22m
+[2m21:03:38[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.css[22m
+[2m21:18:27[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityDetailPage.tsx, /src/pages/ActivitiesPage.tsx, /src/pages/MyActivitiesPage.tsx, /src/pages/ActivityChatPage.tsx[22m
+[2m21:18:43[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MessageList.tsx[22m
+[2m21:18:54[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityChatPage.tsx[22m
+[2m21:19:06[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivitiesPage.tsx[22m
+[2m21:19:19[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyActivitiesPage.tsx[22m
+[2m21:19:29[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityDetailPage.tsx[22m
+[2m21:19:45[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityDetailPage.tsx[22m
+[2m21:22:54[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityDetailPage.tsx, /src/pages/ActivitiesPage.tsx, /src/pages/MyActivitiesPage.tsx, /src/components/MessageList.tsx[22m
+[2m21:23:00[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MessageList.tsx[22m
+[2m21:23:07[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityChatPage.tsx[22m
+[2m21:23:16[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivitiesPage.tsx[22m
+[2m21:23:25[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyActivitiesPage.tsx[22m
+[2m21:23:31[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityDetailPage.tsx[22m
+[2m21:26:49[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MessageList.tsx[22m
+[2m21:29:12[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivitiesPage.tsx, /src/pages/ActivityDetailPage.tsx, /src/components/ActivityForm.tsx, /src/pages/MyActivitiesPage.tsx[22m
+[2m21:29:21[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityDetailPage.tsx[22m
+[2m21:34:43[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivitiesPage.tsx, /src/pages/ActivityDetailPage.tsx, /src/components/ActivityForm.tsx, /src/pages/MyActivitiesPage.tsx[22m
+[2m21:35:05[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ActivityCard.tsx[22m
+[2m21:35:10[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivitiesPage.tsx[22m
+[2m21:35:19[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyActivitiesPage.tsx[22m
+[2m21:35:38[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityDetailPage.tsx[22m
+[2m21:35:44[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MessageInput.tsx[22m
+[2m21:35:51[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.css[22m
+[2m21:44:17[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivitiesPage.tsx, /src/pages/ActivityDetailPage.tsx, /src/components/ActivityForm.tsx, /src/pages/MyActivitiesPage.tsx[22m
+[2m21:44:23[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ActivityCard.tsx[22m
+[2m21:44:32[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivitiesPage.tsx[22m
+[2m21:44:38[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyActivitiesPage.tsx[22m
+[2m21:44:56[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ActivityDetailPage.tsx[22m
+[2m22:03:28[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/AuthForm.tsx, /src/pages/ActivityDetailPage.tsx, /src/pages/ActivitiesPage.tsx, /src/pages/MyActivitiesPage.tsx, /src/pages/ActivityChatPage.tsx[22m
+[2m22:04:10[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/routes/AppRoutes.tsx[22m
+[2m22:04:13[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Navigation.tsx[22m
+[2m22:04:31[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.css[22m

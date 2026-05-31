@@ -27,6 +27,23 @@ export interface CurrentUser {
   ciudad?: string;
   bio?: string;
   intereses?: string[];
+  fotoPerfilUrl?: string;
+  edad?: number | null;
+  genero?: string;
+  instagram?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface UpdateProfileDto {
+  nombre?: string;
+  ciudad?: string;
+  bio?: string;
+  intereses?: string[];
+  fotoPerfilUrl?: string;
+  edad?: number | null;
+  genero?: string;
+  instagram?: string;
 }
 
 export function registerUser(payload: RegisterDto) {
@@ -39,6 +56,11 @@ export function loginUser(payload: LoginDto) {
 
 export async function fetchCurrentUser() {
   const response = await api.get<CurrentUser>('/users/me');
+  return response.data;
+}
+
+export async function updateCurrentUser(payload: UpdateProfileDto) {
+  const response = await api.patch<CurrentUser>('/users/me', payload);
   return response.data;
 }
 

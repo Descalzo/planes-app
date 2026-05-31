@@ -22,6 +22,21 @@ export class User {
 
   @Prop({ default: [] })
   intereses?: string[];
+
+  @Prop()
+  fotoPerfilUrl?: string;
+
+  @Prop()
+  edad?: number;
+
+  @Prop()
+  genero?: string;
+
+  @Prop()
+  instagram?: string;
+
+  @Prop({ select: false })
+  telefono?: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

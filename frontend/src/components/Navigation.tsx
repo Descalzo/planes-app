@@ -22,6 +22,7 @@ export default function Navigation() {
             <>
               <Link className="nav-link" to="/activities">Actividades</Link>
               <Link className="nav-link" to="/my-activities">Mis actividades</Link>
+              <Link className="nav-link" to="/profile">Mi perfil</Link>
               <Link className="button button--primary button--small" to="/activities/new">Crear actividad</Link>
               <button className="button button--ghost button--small" type="button" onClick={handleLogout}>
                 Cerrar sesion
