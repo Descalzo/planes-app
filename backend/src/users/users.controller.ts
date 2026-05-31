@@ -1,11 +1,12 @@
-import { Controller, Post, Get, Body, Param, Patch, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { Controller, Post, Get, Body, Param, Patch, UseGuards, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { LoginUserDto } from './dto/login-user.dto';
 import { UpdateProfileDto } from './dto/update-user.dto';
 import { AuthService } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { ParseObjectIdPipe } from '../common/pipes/parse-object-id.pipe';
 
@@ -45,6 +46,20 @@ export class UsersController {
     @Body() updateUserDto: UpdateProfileDto,
   ) {
     return this.usersService.updateProfile(user.id, updateUserDto);
+  }
+
+  @Get(':id/public')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiParam({ name: 'id', description: 'ID del usuario', type: String })
+  @ApiQuery({ name: 'activityId', description: 'ID de la actividad para validar permisos', type: String, required: false })
+  @ApiOperation({ summary: 'Obtener perfil público limitado de un usuario' })
+  async getPublicProfile(
+    @Param('id', ParseObjectIdPipe) userId: string,
+    @Query('activityId') activityId?: string,
+    @CurrentUser() user?: { id: string },
+  ) {
+    const requesterId = user?.id;
+    return this.usersService.getPublicProfile(userId, activityId, requesterId);
   }
 
   @Get(':id')

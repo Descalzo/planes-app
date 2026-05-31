@@ -7,6 +7,8 @@ import CreateActivityPage from '../pages/CreateActivityPage';
 import ActivityDetailPage from '../pages/ActivityDetailPage';
 import ActivityChatPage from '../pages/ActivityChatPage';
 import ProfilePage from '../pages/ProfilePage';
+import UserPublicProfilePage from '../pages/UserPublicProfilePage';
+import EditActivityPage from '../pages/EditActivityPage';
 import { getAuthToken } from '../services/api';
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
@@ -64,10 +66,26 @@ export function AppRoutes() {
         }
       />
       <Route
+        path="/activities/:activityId/edit"
+        element={
+          <ProtectedRoute>
+            <EditActivityPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/activities/:activityId/chat"
         element={
           <ProtectedRoute>
             <ActivityChatPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users/:userId/profile"
+        element={
+          <ProtectedRoute>
+            <UserPublicProfilePage />
           </ProtectedRoute>
         }
       />

@@ -23,6 +23,15 @@ function getErrorMessage(error: unknown) {
   return 'No se pudo enviar el mensaje';
 }
 
+function SendIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
+  );
+}
+
 export default function MessageInput({ activityId, onSent }: MessageInputProps) {
   const [text, setText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,14 +59,21 @@ export default function MessageInput({ activityId, onSent }: MessageInputProps) 
 
   return (
     <form className="message-input" onSubmit={handleSubmit}>
-      <textarea
-        value={text}
-        placeholder="Escribe un mensaje..."
-        onChange={(event) => setText(event.target.value)}
-      />
-      {error && <p role="alert">{error}</p>}
-      <button className="button button--primary" type="submit" disabled={isSubmitting}>
-        {isSubmitting ? 'Enviando...' : 'Enviar'}
+      <div className="message-input__body">
+        <textarea
+          value={text}
+          placeholder="Escribe un mensaje..."
+          onChange={(event) => setText(event.target.value)}
+        />
+        {error && <p role="alert">{error}</p>}
+      </div>
+      <button
+        className="button button--primary message-input__send"
+        type="submit"
+        disabled={isSubmitting}
+        aria-label={isSubmitting ? 'Enviando' : 'Enviar mensaje'}
+      >
+        {isSubmitting ? '···' : <SendIcon />}
       </button>
     </form>
   );

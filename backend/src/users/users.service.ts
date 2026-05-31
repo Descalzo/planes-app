@@ -1,6 +1,6 @@
-import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { User, UserDocument } from './schemas/user.schema';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -9,7 +9,10 @@ import { UpdateProfileDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel('Activity') private activityModel: Model<any>,
+  ) {}
 
   async create(createUserDto: CreateUserDto): Promise<Omit<User, 'password'>> {
     // Verificar si el email ya existe
@@ -90,5 +93,64 @@ export class UsersService {
 
   async findByEmail(email: string): Promise<UserDocument | null> {
     return this.userModel.findOne({ email });
+  }
+
+  async getPublicProfile(
+    userId: string,
+    activityId?: string,
+    requesterId?: string,
+  ): Promise<Omit<User, 'password' | 'email' | 'telefono'>> {
+    const user = await this.userModel.findById(userId).select('-password -email -telefono').exec();
+    if (!user) {
+      throw new NotFoundException(`Usuario con ID ${userId} no encontrado`);
+    }
+
+    // Si no hay activityId, no se puede ver el perfil (a menos que sea la misma persona)
+    if (!activityId) {
+      if (requesterId && requesterId === userId) {
+        return user.toObject();
+      }
+      throw new ForbiddenException('Acceso denegado al perfil público');
+    }
+
+    // Validar que la actividad existe
+    const activity = await this.activityModel.findById(activityId).exec();
+    if (!activity) {
+      throw new NotFoundException(`Actividad con ID ${activityId} no encontrada`);
+    }
+
+    const userIdObj = new Types.ObjectId(userId);
+    const requestIdObj = requesterId ? new Types.ObjectId(requesterId) : null;
+    const isCreator = activity.creador.toString() === userId;
+    const isParticipant = (activity.participantes ?? []).some((p: Types.ObjectId) => p.toString() === userId);
+
+    // Caso 1: Si el usuario solicitado es creador, cualquiera puede verlo desde la actividad
+    if (isCreator) {
+      return user.toObject();
+    }
+
+    // Caso 2: Si el usuario solicitado es participante
+    if (isParticipant) {
+      // Si no hay requesterId, no puede ver (debe estar autenticado)
+      if (!requestIdObj) {
+        throw new ForbiddenException('Acceso denegado al perfil público');
+      }
+
+      const requesterIdStr = requestIdObj.toString();
+      const requesterIsCreator = activity.creador.toString() === requesterIdStr;
+      const requesterIsParticipant = (activity.participantes ?? []).some(
+        (p: Types.ObjectId) => p.toString() === requesterIdStr,
+      );
+
+      // Solo el creador u otros participantes pueden ver a los participantes
+      if (requesterIsCreator || requesterIsParticipant) {
+        return user.toObject();
+      }
+
+      throw new ForbiddenException('Acceso denegado al perfil público');
+    }
+
+    // Si el usuario no es ni creador ni participante, acceso denegado
+    throw new ForbiddenException('Acceso denegado al perfil público');
   }
 }

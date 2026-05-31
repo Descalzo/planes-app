@@ -28,6 +28,15 @@ export interface ActivityCreateDto {
   plazas?: number;
 }
 
+export interface ActivityUpdateDto {
+  titulo?: string;
+  descripcion?: string;
+  categoria?: string;
+  ciudad?: string;
+  fecha?: string;
+  plazas?: number;
+}
+
 export async function fetchActivities() {
   const response = await api.get<Activity[]>('/activities');
   return response.data;
@@ -40,6 +49,11 @@ export async function fetchActivity(activityId: string) {
 
 export async function createActivity(payload: ActivityCreateDto) {
   const response = await api.post<Activity>('/activities', payload);
+  return response.data;
+}
+
+export async function updateActivity(activityId: string, payload: ActivityUpdateDto) {
+  const response = await api.patch<Activity>(`/activities/${activityId}`, payload);
   return response.data;
 }
 

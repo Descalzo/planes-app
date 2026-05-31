@@ -46,8 +46,8 @@ export default function ActivityCard({
           <div className="activity-card__notices">
             {isRemoved && <span>Ya no formas parte de esta actividad</span>}
             {leftUsersCount > 0 && <span>{leftUsersCount} se desapuntaron</span>}
-            {hasActivityUpdates && <span>Novedades en tu actividad</span>}
-            {hasUnreadMessages && <span>Mensajes nuevos</span>}
+            {hasActivityUpdates && <Link className="activity-card__notice-link" to={`/activities/${id}`}>Novedades en tu actividad</Link>}
+            {hasUnreadMessages && <Link className="activity-card__notice-link" to={`/activities/${id}/chat`}>Mensajes nuevos</Link>}
           </div>
         )}
         <h2>{title}</h2>

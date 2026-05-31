@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Activity, ActivityDocument } from './schemas/activity.schema';
 import { CreateActivityDto } from './dto/create-activity.dto';
+import { UpdateActivityDto } from './dto/update-activity.dto';
 import { User, UserDocument } from '../users/schemas/user.schema';
 
 @Injectable()
@@ -84,6 +85,28 @@ export class ActivitiesService {
       chatSilenciados: [],
     });
     return newActivity.save();
+  }
+
+  async update(id: string, dto: UpdateActivityDto, userId: string): Promise<any> {
+    const activity = await this.activityModel.findById(id).exec();
+    if (!activity) {
+      throw new NotFoundException(`Actividad con ID ${id} no encontrada`);
+    }
+    if (activity.creador.toString() !== userId) {
+      throw new ForbiddenException('Solo el creador puede editar esta actividad');
+    }
+
+    const { titulo, descripcion, categoria, ciudad, fecha, plazas } = dto;
+    if (titulo !== undefined) activity.titulo = titulo;
+    if (descripcion !== undefined) activity.descripcion = descripcion;
+    if (categoria !== undefined) activity.categoria = categoria;
+    if (ciudad !== undefined) activity.ciudad = ciudad;
+    if (fecha !== undefined) activity.fecha = new Date(fecha);
+    if (plazas !== undefined) activity.plazas = plazas;
+
+    await activity.save();
+    const [hydrated] = await this.hydrateActivities([activity]);
+    return hydrated;
   }
 
   async findAll(): Promise<any[]> {

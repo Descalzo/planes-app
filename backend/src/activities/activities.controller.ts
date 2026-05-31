@@ -2,6 +2,7 @@ import { Controller, Get, Post, Patch, Body, Param, UseGuards } from '@nestjs/co
 import { ApiBearerAuth, ApiParam, ApiTags } from '@nestjs/swagger';
 import { ActivitiesService } from './activities.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
+import { UpdateActivityDto } from './dto/update-activity.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ParseObjectIdPipe } from '../common/pipes/parse-object-id.pipe';
@@ -27,6 +28,18 @@ export class ActivitiesController {
   @ApiParam({ name: 'id', description: 'ID de la actividad', type: String })
   findById(@Param('id', ParseObjectIdPipe) id: string) {
     return this.activitiesService.findById(id);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiParam({ name: 'id', description: 'ID de la actividad', type: String })
+  update(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Body() updateActivityDto: UpdateActivityDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.activitiesService.update(id, updateActivityDto, user.id);
   }
 
   @Patch(':id/join')

@@ -64,6 +64,13 @@ export async function updateCurrentUser(payload: UpdateProfileDto) {
   return response.data;
 }
 
+export async function fetchUserPublicProfile(userId: string, activityId?: string) {
+  const response = await api.get<CurrentUser>(`/users/${userId}/public`, {
+    params: { activityId },
+  });
+  return response.data;
+}
+
 export async function authenticate(payload: LoginDto) {
   const response = await loginUser(payload);
   setAuthToken(response.data.access_token);

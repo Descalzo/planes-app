@@ -13,10 +13,25 @@ import { CurrentUser, fetchCurrentUser } from '../services/authService';
 import { fetchMessages } from '../services/messageService';
 import { hasActivityUpdates, hasUnreadMessages } from '../services/notificationService';
 
+const CATEGORIES = [
+  'Deporte y aire libre',
+  'Ocio y social',
+  'Conocer gente',
+  'Gastronomía',
+  'Cultura',
+  'Aficiones',
+  'Viajes y escapadas',
+  'Formación',
+  'Familia',
+  'Voluntariado',
+  'Otros',
+];
+
 export default function ActivitiesPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [unreadMessageActivityIds, setUnreadMessageActivityIds] = useState<Set<string>>(new Set());
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,6 +73,9 @@ export default function ActivitiesPage() {
   }, []);
 
   const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
+  const filteredActivities = selectedCategory
+    ? activities.filter((a) => a.categoria === selectedCategory)
+    : activities;
 
   useEffect(() => {
     if (!currentUserId || activities.length === 0) {
@@ -109,13 +127,37 @@ export default function ActivitiesPage() {
         {isLoading && <p>Cargando actividades...</p>}
         {error && <p role="alert">{error}</p>}
         {!isLoading && !error && (
-          <div className="section-heading">
-            <h2>Todas las actividades</h2>
-          </div>
+          <>
+            <div className="category-filter">
+              <button
+                className={`category-filter__chip${selectedCategory === null ? ' category-filter__chip--active' : ''}`}
+                type="button"
+                onClick={() => setSelectedCategory(null)}
+              >
+                Todas
+              </button>
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  className={`category-filter__chip${selectedCategory === cat ? ' category-filter__chip--active' : ''}`}
+                  type="button"
+                  onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <div className="section-heading">
+              <h2>{selectedCategory ?? 'Todas las actividades'}</h2>
+              <span className="section-heading__badge">{filteredActivities.length}</span>
+            </div>
+          </>
         )}
-        {!isLoading && !error && activities.length === 0 && <p>No hay actividades todavia.</p>}
+        {!isLoading && !error && filteredActivities.length === 0 && (
+          <p>No hay actividades{selectedCategory ? ` en "${selectedCategory}"` : ' todavia'}.</p>
+        )}
         <div className="activity-grid">
-          {activities.map((activity) => (
+          {filteredActivities.map((activity) => (
             <ActivityCard
               key={activity._id}
               id={activity._id}

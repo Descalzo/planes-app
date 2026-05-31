@@ -237,53 +237,80 @@ export default function ActivityDetailPage() {
               <p><span>Participantes</span>{participants}</p>
               <p><span>Plazas</span>{availableSpots === null ? 'No indicadas' : availableSpots}</p>
             </div>
+            <div className="creator-info">
+              <h3>Organizador</h3>
+              <div className="creator-card">
+                <div>
+                  <strong>{getReferenceName(activity.creador)}</strong>
+                </div>
+                {!isCreator && getReferenceId(activity.creador) !== currentUserId && (
+                  <Link
+                    className="button button--ghost button--small"
+                    to={`/users/${getReferenceId(activity.creador)}/profile?activityId=${activityId}`}
+                  >
+                    Ver perfil
+                  </Link>
+                )}
+              </div>
+            </div>
             {isCreator && (
               <div className="participants-panel">
                 <h2>Participantes</h2>
                 <div className="participants-list">
-                  {visibleParticipants.map((participant) => {
-                    const participantId = getReferenceId(participant);
-                    const isCurrentCreator = participantId === currentUserId;
-                    const isMuted = Boolean(activity && participantId && isUserMutedInActivity(activity, participantId));
+                  {(activity.participantes ?? [])
+                    .map((participant) => {
+                      const participantId = getReferenceId(participant);
+                      const isCurrentCreator = participantId === currentUserId;
+                      const isMuted = Boolean(activity && participantId && isUserMutedInActivity(activity, participantId));
 
-                    if (!participantId) {
-                      return null;
-                    }
+                      if (!participantId) {
+                        return null;
+                      }
 
-                    return (
-                      <div className="participant-row" key={participantId}>
-                        <div>
-                          <strong>{getReferenceName(participant)}</strong>
-                          {isCurrentCreator && <span> Creador</span>}
-                          {isMuted && <span> Silenciado</span>}
-                        </div>
-                        {!isCurrentCreator && (
-                          <div className="participant-actions">
-                            <button
-                              className="button button--ghost button--small"
-                              type="button"
-                              disabled={mutingParticipantId === participantId}
-                              onClick={() => handleToggleMute(participantId, isMuted)}
-                            >
-                              {mutingParticipantId === participantId
-                                ? 'Guardando...'
-                                : isMuted
-                                  ? 'Permitir hablar'
-                                  : 'Silenciar chat'}
-                            </button>
-                            <button
-                              className="button button--ghost button--small"
-                              type="button"
-                              disabled={removingParticipantId === participantId}
-                              onClick={() => handleRemoveParticipant(participantId)}
-                            >
-                              {removingParticipantId === participantId ? 'Quitando...' : 'Quitar'}
-                            </button>
+                      return (
+                        <div className="participant-row" key={participantId}>
+                          <div>
+                            <strong>{getReferenceName(participant)}</strong>
+                            {isCurrentCreator && <span> Tú (Creador)</span>}
+                            {isMuted && <span> Silenciado</span>}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                          <div className="participant-actions">
+                            {!isCurrentCreator && (
+                              <Link 
+                                className="button button--ghost button--small" 
+                                to={`/users/${participantId}/profile?activityId=${activityId}`}
+                              >
+                                Ver perfil
+                              </Link>
+                            )}
+                            {!isCurrentCreator && (
+                              <>
+                                <button
+                                  className="button button--ghost button--small"
+                                  type="button"
+                                  disabled={mutingParticipantId === participantId}
+                                  onClick={() => handleToggleMute(participantId, isMuted)}
+                                >
+                                  {mutingParticipantId === participantId
+                                    ? 'Guardando...'
+                                    : isMuted
+                                      ? 'Permitir hablar'
+                                      : 'Silenciar chat'}
+                                </button>
+                                <button
+                                  className="button button--ghost button--small"
+                                  type="button"
+                                  disabled={removingParticipantId === participantId}
+                                  onClick={() => handleRemoveParticipant(participantId)}
+                                >
+                                  {removingParticipantId === participantId ? 'Quitando...' : 'Quitar'}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                 </div>
                 {usersWhoLeft.length > 0 && (
                   <>
@@ -339,6 +366,37 @@ export default function ActivityDetailPage() {
                 )}
               </div>
             )}
+            {isJoined && !isCreator && (
+              <div className="participants-panel">
+                <h2>Participantes</h2>
+                <div className="participants-list">
+                  {(activity.participantes ?? [])
+                    .filter((p) => getReferenceId(p) !== currentUserId)
+                    .map((participant) => {
+                      const participantId = getReferenceId(participant);
+                      if (!participantId) {
+                        return null;
+                      }
+
+                      return (
+                        <div className="participant-row" key={participantId}>
+                          <div>
+                            <strong>{getReferenceName(participant)}</strong>
+                          </div>
+                          {participantId !== currentUserId && (
+                            <Link
+                              className="button button--ghost button--small"
+                              to={`/users/${participantId}/profile?activityId=${activityId}`}
+                            >
+                              Ver perfil
+                            </Link>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
             <div className="detail-actions">
               {isRemoved ? (
                 <p className="status-pill status-pill--danger">Te han quitado de esta actividad</p>
@@ -355,6 +413,11 @@ export default function ActivityDetailPage() {
                 <button className="button button--primary" type="button" onClick={handleJoin} disabled={isJoining}>
                   {isJoining ? 'Uniendo...' : 'Unirse'}
                 </button>
+              )}
+              {isCreator && activityId && (
+                <Link className="button button--ghost" to={`/activities/${activityId}/edit`}>
+                  Editar
+                </Link>
               )}
               {activityId && (
                 <Link className="button button--secondary" to={`/activities/${activityId}/chat`}>

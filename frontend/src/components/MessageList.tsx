@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { fetchMessages, Message } from '../services/messageService';
+import { fetchMessages, Message, MessageAuthor } from '../services/messageService';
 import { markChatSeen } from '../services/notificationService';
 
 interface MessageListProps {
@@ -12,15 +12,21 @@ function getAuthorName(message: Message) {
   if (typeof message.author === 'object') {
     return message.author.nombre ?? 'Usuario';
   }
-
   return 'Usuario';
+}
+
+function getAuthorId(message: Message): string | null {
+  if (typeof message.author === 'object' && message.author !== null) {
+    return (message.author as MessageAuthor)._id ?? (message.author as MessageAuthor).id ?? null;
+  }
+  return typeof message.author === 'string' ? message.author : null;
 }
 
 export default function MessageList({ activityId, refreshKey, currentUserId }: MessageListProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const messagesBoxRef = useRef<HTMLDivElement | null>(null);
+  const messagesBoxRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!activityId) {
@@ -69,23 +75,30 @@ export default function MessageList({ activityId, refreshKey, currentUserId }: M
     if (!messagesBox) {
       return;
     }
-
     messagesBox.scrollTop = messagesBox.scrollHeight;
   }, [messages.length]);
 
   return (
-    <section className="message-list">
+    <section className="message-list" ref={messagesBoxRef}>
       <h2>Mensajes</h2>
       {isLoading && <p>Cargando mensajes...</p>}
       {error && <p role="alert">{error}</p>}
-      {!isLoading && !error && messages.length === 0 && <p>No hay mensajes todavia.</p>}
-      <div className="message-list__box" ref={messagesBoxRef}>
-        {messages.map((message) => (
-          <div className="message-card" key={message._id}>
-            <strong>{getAuthorName(message)}</strong>
-            <p>{message.text}</p>
-          </div>
-        ))}
+      {!isLoading && !error && messages.length === 0 && <p>Sin mensajes todavia.</p>}
+      <div className="message-list__box">
+        {messages.map((message) => {
+          const isOwn = Boolean(currentUserId && getAuthorId(message) === currentUserId);
+          return (
+            <div
+              key={message._id}
+              className={`message-bubble ${isOwn ? 'message-bubble--own' : 'message-bubble--other'}`}
+            >
+              {!isOwn && (
+                <span className="message-bubble__author">{getAuthorName(message)}</span>
+              )}
+              <p className="message-bubble__text">{message.text}</p>
+            </div>
+          );
+        })}
       </div>
     </section>
   );

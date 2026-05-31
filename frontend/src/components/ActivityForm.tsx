@@ -62,7 +62,20 @@ export default function ActivityForm() {
       </label>
       <label>
         Categoria
-        <input value={category} onChange={(event) => setCategory(event.target.value)} />
+        <select value={category} onChange={(event) => setCategory(event.target.value)}>
+          <option value="">Sin categoría</option>
+          <option>Deporte y aire libre</option>
+          <option>Ocio y social</option>
+          <option>Conocer gente</option>
+          <option>Gastronomía</option>
+          <option>Cultura</option>
+          <option>Aficiones</option>
+          <option>Viajes y escapadas</option>
+          <option>Formación</option>
+          <option>Familia</option>
+          <option>Voluntariado</option>
+          <option>Otros</option>
+        </select>
       </label>
       <label>
         Ciudad
