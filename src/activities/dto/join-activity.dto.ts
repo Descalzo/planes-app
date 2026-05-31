@@ -1,3 +1,7 @@
+import { IsString, IsOptional } from 'class-validator';
+
 export class JoinActivityDto {
-  usuario: string;
+  @IsString()
+  @IsOptional()
+  usuario?: string;
 }

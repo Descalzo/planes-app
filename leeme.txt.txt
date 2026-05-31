@@ -2,3 +2,10 @@ descalzo2012_db_user     QD3VH6Uyhru4mB1m
 
 mongodb+srv://descalzo2012_db_user:QD3VH6Uyhru4mB1m@cluster0.eiibmw8.mongodb.net/?appName=Cluster0
 
+
+1. JWT
+2. Participantes mediante IDs reales
+3. GET /users/me
+4. Chat por actividad
+5. Frontend React
+6. Mapa y geolocalización

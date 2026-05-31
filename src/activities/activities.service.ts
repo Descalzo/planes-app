@@ -3,14 +3,16 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Activity, ActivityDocument } from './schemas/activity.schema';
 import { CreateActivityDto } from './dto/create-activity.dto';
-import { JoinActivityDto } from './dto/join-activity.dto';
 
 @Injectable()
 export class ActivitiesService {
   constructor(@InjectModel(Activity.name) private activityModel: Model<ActivityDocument>) {}
 
-  async create(createActivityDto: CreateActivityDto): Promise<Activity> {
-    const newActivity = new this.activityModel(createActivityDto);
+  async create(createActivityDto: CreateActivityDto, creador: string): Promise<Activity> {
+    const newActivity = new this.activityModel({
+      ...createActivityDto,
+      creador,
+    });
     return newActivity.save();
   }
 
@@ -26,7 +28,7 @@ export class ActivitiesService {
     return activity;
   }
 
-  async joinActivity(id: string, joinActivityDto: JoinActivityDto): Promise<Activity> {
+  async joinActivity(id: string, usuario: string): Promise<Activity> {
     const activity = await this.activityModel.findById(id).exec();
 
     if (!activity) {
@@ -34,7 +36,7 @@ export class ActivitiesService {
     }
 
     // Verificar si el usuario ya está apuntado
-    if (activity.participantes.includes(joinActivityDto.usuario)) {
+    if (activity.participantes.includes(usuario)) {
       throw new BadRequestException('El usuario ya está apuntado a esta actividad');
     }
 
@@ -44,7 +46,7 @@ export class ActivitiesService {
     }
 
     // Añadir el usuario a los participantes
-    activity.participantes.push(joinActivityDto.usuario);
+    activity.participantes.push(usuario);
     return activity.save();
   }
 }

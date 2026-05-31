@@ -1,15 +1,20 @@
-import { Controller, Get, Post, Patch, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ActivitiesService } from './activities.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
-import { JoinActivityDto } from './dto/join-activity.dto';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
+@ApiTags('activities')
 @Controller('activities')
 export class ActivitiesController {
   constructor(private activitiesService: ActivitiesService) {}
 
   @Post()
-  create(@Body() createActivityDto: CreateActivityDto) {
-    return this.activitiesService.create(createActivityDto);
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  create(@Body() createActivityDto: CreateActivityDto, @CurrentUser() user: { nombre: string }) {
+    return this.activitiesService.create(createActivityDto, user.nombre);
   }
 
   @Get()
@@ -23,7 +28,9 @@ export class ActivitiesController {
   }
 
   @Patch(':id/join')
-  joinActivity(@Param('id') id: string, @Body() joinActivityDto: JoinActivityDto) {
-    return this.activitiesService.joinActivity(id, joinActivityDto);
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  joinActivity(@Param('id') id: string, @CurrentUser() user: { nombre: string }) {
+    return this.activitiesService.joinActivity(id, user.nombre);
   }
 }

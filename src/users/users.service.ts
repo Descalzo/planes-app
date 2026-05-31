@@ -10,7 +10,7 @@ import { LoginUserDto } from './dto/login-user.dto';
 export class UsersService {
   constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
 
-  async create(createUserDto: CreateUserDto): Promise<Omit<User, 'contraseña'>> {
+  async create(createUserDto: CreateUserDto): Promise<Omit<User, 'password'>> {
     // Verificar si el email ya existe
     const existingUser = await this.userModel.findOne({ email: createUserDto.email });
     if (existingUser) {
@@ -23,27 +23,27 @@ export class UsersService {
     // Crear usuario
     const newUser = new this.userModel({
       ...createUserDto,
-      contraseña: hashedPassword,
+      password: hashedPassword,
     });
 
     const savedUser = await newUser.save();
 
     // Retornar sin la contraseña
-    const { contraseña, ...userWithoutPassword } = savedUser.toObject();
+    const { password, ...userWithoutPassword } = savedUser.toObject();
     return userWithoutPassword;
   }
 
-  async findById(id: string): Promise<Omit<User, 'contraseña'>> {
+  async findById(id: string): Promise<Omit<User, 'password'>> {
     const user = await this.userModel.findById(id).exec();
     if (!user) {
       throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
     }
 
-    const { contraseña, ...userWithoutPassword } = user.toObject();
+    const { password, ...userWithoutPassword } = user.toObject();
     return userWithoutPassword;
   }
 
-  async login(loginUserDto: LoginUserDto): Promise<{ user: Omit<User, 'contraseña'>; id: string }> {
+  async login(loginUserDto: LoginUserDto): Promise<{ user: Omit<User, 'password'>; id: string }> {
     const user = await this.userModel.findOne({ email: loginUserDto.email });
 
     if (!user) {
@@ -51,12 +51,12 @@ export class UsersService {
     }
 
     // Verificar contraseña
-    const isPasswordValid = await bcrypt.compare(loginUserDto.contraseña, user.contraseña);
+    const isPasswordValid = await bcrypt.compare(loginUserDto.contraseña, user.password);
     if (!isPasswordValid) {
       throw new BadRequestException('Email o contraseña incorrectos');
     }
 
-    const { contraseña, ...userWithoutPassword } = user.toObject();
+    const { password, ...userWithoutPassword } = user.toObject();
     return { user: userWithoutPassword, id: user._id.toString() };
   }
 
