@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
+  acceptActivityRequest,
   Activity,
   fetchActivity,
   getActivityParticipantsCount,
@@ -8,11 +9,14 @@ import {
   getReferenceName,
   isActivityCreator,
   isUserMutedInActivity,
+  isUserPendingInActivity,
+  isUserRejectedFromActivity,
   isUserRemovedFromActivity,
   isUserInActivity,
   joinActivity,
   leaveActivity,
   muteActivityParticipant,
+  rejectActivityRequest,
   removeActivityParticipant,
   unbanActivityParticipant,
   unmuteActivityParticipant,
@@ -25,7 +29,7 @@ function getErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
     const response = (error as { response?: { status?: number; data?: { message?: string | string[] } } }).response;
     if (response?.status === 401) {
-      return 'Debes iniciar sesion para unirte';
+      return 'Debes iniciar sesion para solicitar plaza';
     }
 
     const message = response?.data?.message;
@@ -45,6 +49,7 @@ export default function ActivityDetailPage() {
   const [removingParticipantId, setRemovingParticipantId] = useState<string | null>(null);
   const [mutingParticipantId, setMutingParticipantId] = useState<string | null>(null);
   const [unbanningParticipantId, setUnbanningParticipantId] = useState<string | null>(null);
+  const [requestActionId, setRequestActionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -111,23 +116,47 @@ export default function ActivityDetailPage() {
     setIsJoining(true);
     try {
       const updatedActivity = await joinActivity(activityId);
-      setActivity((currentActivity) => {
-        const userId = currentUser?._id ?? currentUser?.id;
-        const nextActivity = updatedActivity ?? currentActivity;
-
-        if (!nextActivity || !userId || isUserInActivity(nextActivity, userId)) {
-          return nextActivity;
-        }
-
-        return {
-          ...nextActivity,
-          participantes: [...(nextActivity.participantes ?? []), userId],
-        };
-      });
+      setActivity(updatedActivity);
     } catch (caughtError) {
       setError(getErrorMessage(caughtError));
     } finally {
       setIsJoining(false);
+    }
+  }
+
+  async function handleAcceptRequest(userId: string) {
+    if (!activityId) {
+      return;
+    }
+
+    setError(null);
+    setRequestActionId(userId);
+    try {
+      const updatedActivity = await acceptActivityRequest(activityId, userId);
+      setActivity(updatedActivity);
+      markActivitySeen(updatedActivity._id, currentUserId);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError));
+    } finally {
+      setRequestActionId(null);
+    }
+  }
+
+  async function handleRejectRequest(userId: string) {
+    if (!activityId) {
+      return;
+    }
+
+    setError(null);
+    setRequestActionId(userId);
+    try {
+      const updatedActivity = await rejectActivityRequest(activityId, userId);
+      setActivity(updatedActivity);
+      markActivitySeen(updatedActivity._id, currentUserId);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError));
+    } finally {
+      setRequestActionId(null);
     }
   }
 
@@ -210,6 +239,8 @@ export default function ActivityDetailPage() {
   const availableSpots = typeof activity?.plazas === 'number' ? Math.max(activity.plazas - participants, 0) : null;
   const isJoined = Boolean(activity && currentUserId && isUserInActivity(activity, currentUserId));
   const isCreator = Boolean(activity && currentUserId && isActivityCreator(activity, currentUserId));
+  const isPending = Boolean(activity && currentUserId && isUserPendingInActivity(activity, currentUserId));
+  const isRejected = Boolean(activity && currentUserId && isUserRejectedFromActivity(activity, currentUserId));
   const isRemoved = Boolean(activity && currentUserId && isUserRemovedFromActivity(activity, currentUserId));
   const visibleParticipants = activity
     ? [activity.creador, ...(activity.participantes ?? [])].filter((participant, index, allParticipants) => {
@@ -219,6 +250,8 @@ export default function ActivityDetailPage() {
     : [];
   const usersWhoLeft = activity?.salidas ?? [];
   const bannedUsers = activity?.expulsados ?? [];
+  const pendingRequests = activity?.solicitudesPendientes ?? [];
+  const mutedUsers = activity?.chatSilenciados ?? [];
 
   return (
     <main className="page page--detail">
@@ -275,6 +308,52 @@ export default function ActivityDetailPage() {
             </div>
             {isCreator && (
               <div className="participants-panel">
+                <h2>Solicitudes pendientes</h2>
+                {pendingRequests.length === 0 ? (
+                  <p>No hay solicitudes pendientes.</p>
+                ) : (
+                  <div className="participants-list">
+                    {pendingRequests.map((user) => {
+                      const userId = getReferenceId(user);
+                      if (!userId) {
+                        return null;
+                      }
+
+                      return (
+                        <div className="participant-row" key={userId}>
+                          <div>
+                            <strong>{getReferenceName(user)}</strong>
+                            <span> Pendiente</span>
+                          </div>
+                          <div className="participant-actions">
+                            <Link
+                              className="button button--ghost button--small"
+                              to={`/users/${userId}/profile?activityId=${activityId}`}
+                            >
+                              Ver perfil
+                            </Link>
+                            <button
+                              className="button button--secondary button--small"
+                              type="button"
+                              disabled={requestActionId === userId}
+                              onClick={() => handleAcceptRequest(userId)}
+                            >
+                              {requestActionId === userId ? 'Guardando...' : 'Aceptar'}
+                            </button>
+                            <button
+                              className="button button--ghost button--small"
+                              type="button"
+                              disabled={requestActionId === userId}
+                              onClick={() => handleRejectRequest(userId)}
+                            >
+                              Rechazar
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 <h2>Participantes</h2>
                 <div className="participants-list">
                   {(activity.participantes ?? [])
@@ -354,6 +433,36 @@ export default function ActivityDetailPage() {
                     </div>
                   </>
                 )}
+                {mutedUsers.length > 0 && (
+                  <>
+                    <h2>Silenciados</h2>
+                    <div className="participants-list">
+                      {mutedUsers.map((user) => {
+                        const userId = getReferenceId(user);
+                        if (!userId) {
+                          return null;
+                        }
+
+                        return (
+                          <div className="participant-row" key={userId}>
+                            <div>
+                              <strong>{getReferenceName(user)}</strong>
+                              <span> No puede escribir en el chat</span>
+                            </div>
+                            <button
+                              className="button button--ghost button--small"
+                              type="button"
+                              disabled={mutingParticipantId === userId}
+                              onClick={() => handleToggleMute(userId, true)}
+                            >
+                              {mutingParticipantId === userId ? 'Guardando...' : 'Permitir hablar'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
                 {bannedUsers.length > 0 && (
                   <>
                     <h2>Expulsados</h2>
@@ -420,9 +529,26 @@ export default function ActivityDetailPage() {
             <div className="detail-actions">
               {isRemoved ? (
                 <p className="status-pill status-pill--danger">Te han quitado de esta actividad</p>
+              ) : isPending ? (
+                <>
+                  <p className="status-pill">Solicitud pendiente de aprobacion</p>
+                  <button className="button button--ghost" type="button" disabled>
+                    Preguntar al organizador
+                  </button>
+                </>
+              ) : isRejected ? (
+                <>
+                  <p className="status-pill status-pill--danger">Solicitud rechazada</p>
+                  <button className="button button--primary" type="button" onClick={handleJoin} disabled={isJoining}>
+                    {isJoining ? 'Solicitando...' : 'Solicitar de nuevo'}
+                  </button>
+                  <button className="button button--ghost" type="button" disabled>
+                    Preguntar al organizador
+                  </button>
+                </>
               ) : isJoined ? (
                 <>
-                  <p className="status-pill">Ya estas apuntado</p>
+                  <p className="status-pill">{isCreator ? 'Eres el organizador' : 'Ya participas'}</p>
                   {!isCreator && (
                     <button className="button button--ghost" type="button" onClick={handleLeave} disabled={isLeaving}>
                       {isLeaving ? 'Saliendo...' : 'Desapuntarme'}
@@ -431,7 +557,7 @@ export default function ActivityDetailPage() {
                 </>
               ) : (
                 <button className="button button--primary" type="button" onClick={handleJoin} disabled={isJoining}>
-                  {isJoining ? 'Uniendo...' : 'Unirse'}
+                  {isJoining ? 'Solicitando...' : 'Solicitar plaza'}
                 </button>
               )}
               {isCreator && activityId && (
@@ -439,7 +565,7 @@ export default function ActivityDetailPage() {
                   Editar
                 </Link>
               )}
-              {activityId && (
+              {activityId && (isCreator || isJoined) && (
                 <Link className="button button--secondary" to={`/activities/${activityId}/chat`}>
                   Ir al chat
                 </Link>

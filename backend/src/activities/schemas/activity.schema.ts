@@ -28,6 +28,12 @@ export class Activity {
   participantes: Types.ObjectId[];
 
   @Prop({ type: [{ type: Types.ObjectId, ref: User.name }], default: [] })
+  solicitudesPendientes: Types.ObjectId[];
+
+  @Prop({ type: [{ type: Types.ObjectId, ref: User.name }], default: [] })
+  solicitudesRechazadas: Types.ObjectId[];
+
+  @Prop({ type: [{ type: Types.ObjectId, ref: User.name }], default: [] })
   expulsados: Types.ObjectId[];
 
   @Prop({ type: [{ type: Types.ObjectId, ref: User.name }], default: [] })

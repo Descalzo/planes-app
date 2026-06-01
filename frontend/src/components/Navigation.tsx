@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { getAuthToken, setAuthToken } from '../services/api';
+import { fetchUnreadNotificationsCount } from '../services/internalNotificationService';
 
 function ExploreIcon() {
   return (
@@ -46,6 +48,15 @@ function LogoutIcon() {
   );
 }
 
+function BellIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+
 function navItemClass({ isActive }: { isActive: boolean }) {
   return `bottom-nav__item${isActive ? ' bottom-nav__item--active' : ''}`;
 }
@@ -55,6 +66,39 @@ export default function Navigation() {
   const location = useLocation();
   const hasToken = Boolean(getAuthToken());
   const isChatPage = /\/activities\/[^/]+\/chat/.test(location.pathname);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+  useEffect(() => {
+    if (!hasToken) {
+      setUnreadNotificationsCount(0);
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadUnreadCount() {
+      try {
+        const count = await fetchUnreadNotificationsCount();
+        if (isMounted) {
+          setUnreadNotificationsCount(count);
+        }
+      } catch {
+        if (isMounted) {
+          setUnreadNotificationsCount(0);
+        }
+      }
+    }
+
+    loadUnreadCount();
+    const intervalId = window.setInterval(loadUnreadCount, 15000);
+    window.addEventListener('planes:notifications-changed', loadUnreadCount);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener('planes:notifications-changed', loadUnreadCount);
+    };
+  }, [hasToken, location.pathname]);
 
   function handleLogout() {
     setAuthToken(null);
@@ -70,15 +114,28 @@ export default function Navigation() {
           </Link>
           <div className="topbar__links">
             {hasToken ? (
-              <button
-                className="topbar__logout"
-                type="button"
-                onClick={handleLogout}
-                title="Cerrar sesion"
-                aria-label="Cerrar sesion"
-              >
-                <LogoutIcon />
-              </button>
+              <>
+                <Link
+                  className="topbar__icon-link"
+                  to="/notifications"
+                  title="Notificaciones"
+                  aria-label={`Notificaciones${unreadNotificationsCount > 0 ? ` (${unreadNotificationsCount} sin leer)` : ''}`}
+                >
+                  <BellIcon />
+                  {unreadNotificationsCount > 0 && (
+                    <span className="topbar__badge">{unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}</span>
+                  )}
+                </Link>
+                <button
+                  className="topbar__logout"
+                  type="button"
+                  onClick={handleLogout}
+                  title="Cerrar sesion"
+                  aria-label="Cerrar sesion"
+                >
+                  <LogoutIcon />
+                </button>
+              </>
             ) : (
               <>
                 <Link className="nav-link" to="/login">Entrar</Link>

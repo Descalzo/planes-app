@@ -128,6 +128,9 @@ export class UsersService {
     const requestIdObj = requesterId ? new Types.ObjectId(requesterId) : null;
     const isCreator = activity.creador.toString() === userId;
     const isParticipant = (activity.participantes ?? []).some((p: Types.ObjectId) => p.toString() === userId);
+    const isPendingRequest = (activity.solicitudesPendientes ?? []).some(
+      (p: Types.ObjectId) => p.toString() === userId,
+    );
 
     // Caso 1: Si el usuario solicitado es creador, cualquiera puede verlo desde la actividad
     if (isCreator) {
@@ -153,6 +156,10 @@ export class UsersService {
       }
 
       throw new ForbiddenException('Acceso denegado al perfil público');
+    }
+
+    if (isPendingRequest && requestIdObj && activity.creador.toString() === requestIdObj.toString()) {
+      return user.toObject();
     }
 
     // Si el usuario no es ni creador ni participante, acceso denegado

@@ -12,6 +12,8 @@ export interface Activity {
   plazas?: number;
   imagenUrl?: string;
   participantes?: EntityReference[];
+  solicitudesPendientes?: EntityReference[];
+  solicitudesRechazadas?: EntityReference[];
   expulsados?: EntityReference[];
   salidas?: EntityReference[];
   chatSilenciados?: EntityReference[];
@@ -40,8 +42,21 @@ export interface ActivityUpdateDto {
   imagenUrl?: string;
 }
 
-export async function fetchActivities() {
-  const response = await api.get<Activity[]>('/activities');
+export type ActivityStatusFilter = 'futuras' | 'pasadas' | 'todas';
+export type ActivitySort = 'fechaAsc' | 'createdDesc' | 'createdAsc';
+
+export interface ActivityFilters {
+  categoria?: string;
+  ciudad?: string;
+  estado?: ActivityStatusFilter;
+  sort?: ActivitySort;
+}
+
+export async function fetchActivities(filters: ActivityFilters = {}) {
+  const params = Object.fromEntries(
+    Object.entries(filters).filter(([, value]) => value !== undefined && value !== ''),
+  );
+  const response = await api.get<Activity[]>('/activities', { params });
   return response.data;
 }
 
@@ -62,6 +77,16 @@ export async function updateActivity(activityId: string, payload: ActivityUpdate
 
 export async function joinActivity(activityId: string) {
   const response = await api.patch<Activity>(`/activities/${activityId}/join`, {});
+  return response.data;
+}
+
+export async function acceptActivityRequest(activityId: string, userId: string) {
+  const response = await api.patch<Activity>(`/activities/${activityId}/requests/${userId}/accept`, {});
+  return response.data;
+}
+
+export async function rejectActivityRequest(activityId: string, userId: string) {
+  const response = await api.patch<Activity>(`/activities/${activityId}/requests/${userId}/reject`, {});
   return response.data;
 }
 
@@ -120,6 +145,14 @@ export function isActivityCreator(activity: Activity, userId: string) {
 
 export function isUserInActivity(activity: Activity, userId: string) {
   return isActivityCreator(activity, userId) || isActivityParticipant(activity, userId);
+}
+
+export function isUserPendingInActivity(activity: Activity, userId: string) {
+  return activity.solicitudesPendientes?.some((user) => getReferenceId(user) === userId) ?? false;
+}
+
+export function isUserRejectedFromActivity(activity: Activity, userId: string) {
+  return activity.solicitudesRechazadas?.some((user) => getReferenceId(user) === userId) ?? false;
 }
 
 export function isUserRemovedFromActivity(activity: Activity, userId: string) {

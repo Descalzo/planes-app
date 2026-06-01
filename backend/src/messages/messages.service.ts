@@ -14,10 +14,21 @@ export class MessagesService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {}
 
+  private canAccessChat(activity: ActivityDocument, userId: string) {
+    return (
+      activity.creador.toString() === userId ||
+      (activity.participantes ?? []).some((participant) => participant.toString() === userId)
+    );
+  }
+
   async create(activityId: string, userId: string, createMessageDto: CreateMessageDto): Promise<Message> {
     const activity = await this.activityModel.findById(activityId).exec();
     if (!activity) {
       throw new NotFoundException(`Actividad con ID ${activityId} no encontrada`);
+    }
+
+    if (!this.canAccessChat(activity, userId)) {
+      throw new ForbiddenException('Solo los participantes aceptados pueden acceder a este chat');
     }
 
     const isMuted = (activity.chatSilenciados ?? []).some((user) => user.toString() === userId);
@@ -40,10 +51,14 @@ export class MessagesService {
     return newMessage.save();
   }
 
-  async findByActivity(activityId: string): Promise<Message[]> {
+  async findByActivity(activityId: string, userId: string): Promise<Message[]> {
     const activity = await this.activityModel.findById(activityId).exec();
     if (!activity) {
       throw new NotFoundException(`Actividad con ID ${activityId} no encontrada`);
+    }
+
+    if (!this.canAccessChat(activity, userId)) {
+      throw new ForbiddenException('Solo los participantes aceptados pueden acceder a este chat');
     }
 
     return this.messageModel

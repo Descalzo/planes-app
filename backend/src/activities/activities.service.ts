@@ -5,12 +5,24 @@ import { Activity, ActivityDocument } from './schemas/activity.schema';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 import { User, UserDocument } from '../users/schemas/user.schema';
+import { NotificationsService } from '../notifications/notifications.service';
+
+type ActivitiesStatusFilter = 'futuras' | 'pasadas' | 'todas';
+type ActivitiesSort = 'fechaAsc' | 'createdDesc' | 'createdAsc';
+
+interface FindAllActivitiesOptions {
+  categoria?: string;
+  ciudad?: string;
+  estado?: string;
+  sort?: string;
+}
 
 @Injectable()
 export class ActivitiesService {
   constructor(
     @InjectModel(Activity.name) private activityModel: Model<ActivityDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private notificationsService: NotificationsService,
   ) {}
 
   private getValidObjectId(value: unknown) {
@@ -41,6 +53,8 @@ export class ActivitiesService {
 
       [
         ...(activity.participantes ?? []),
+        ...(activity.solicitudesPendientes ?? []),
+        ...(activity.solicitudesRechazadas ?? []),
         ...(activity.expulsados ?? []),
         ...(activity.salidas ?? []),
         ...(activity.chatSilenciados ?? []),
@@ -67,11 +81,48 @@ export class ActivitiesService {
         ...plainActivity,
         creador: creatorId ? usersById.get(creatorId) ?? creatorId : plainActivity.creador,
         participantes: this.hydrateUserReferences(activity.participantes, usersById),
+        solicitudesPendientes: this.hydrateUserReferences(activity.solicitudesPendientes, usersById),
+        solicitudesRechazadas: this.hydrateUserReferences(activity.solicitudesRechazadas, usersById),
         expulsados: this.hydrateUserReferences(activity.expulsados, usersById),
         salidas: this.hydrateUserReferences(activity.salidas, usersById),
         chatSilenciados: this.hydrateUserReferences(activity.chatSilenciados, usersById),
       };
     });
+  }
+
+  private escapeRegex(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private getStatusFilter(status?: string): ActivitiesStatusFilter {
+    return status === 'pasadas' || status === 'todas' ? status : 'futuras';
+  }
+
+  private getSort(sort?: string): ActivitiesSort {
+    return sort === 'createdDesc' || sort === 'createdAsc' ? sort : 'fechaAsc';
+  }
+
+  private sortActivitiesByDateAsc(activities: ActivityDocument[]) {
+    return [...activities].sort((a, b) => {
+      const aTime = a.fecha ? new Date(a.fecha).getTime() : Number.POSITIVE_INFINITY;
+      const bTime = b.fecha ? new Date(b.fecha).getTime() : Number.POSITIVE_INFINITY;
+
+      if (aTime !== bTime) {
+        return aTime - bTime;
+      }
+
+      const aCreatedAt = a.get('createdAt') ? new Date(a.get('createdAt')).getTime() : 0;
+      const bCreatedAt = b.get('createdAt') ? new Date(b.get('createdAt')).getTime() : 0;
+      return bCreatedAt - aCreatedAt;
+    });
+  }
+
+  private hasUser(references: Types.ObjectId[] | undefined, userId: string) {
+    return (references ?? []).some((reference) => reference.toString() === userId);
+  }
+
+  private removeUser(references: Types.ObjectId[] | undefined, userId: string) {
+    return (references ?? []).filter((reference) => reference.toString() !== userId);
   }
 
   async create(createActivityDto: CreateActivityDto, creadorId: string): Promise<Activity> {
@@ -80,6 +131,8 @@ export class ActivitiesService {
       ...createActivityDto,
       creador: creadorObjectId,
       participantes: [creadorObjectId],
+      solicitudesPendientes: [],
+      solicitudesRechazadas: [],
       expulsados: [],
       salidas: [],
       chatSilenciados: [],
@@ -110,9 +163,37 @@ export class ActivitiesService {
     return hydrated;
   }
 
-  async findAll(): Promise<any[]> {
-    const activities = await this.activityModel.find().exec();
-    return this.hydrateActivities(activities);
+  async findAll(options: FindAllActivitiesOptions = {}): Promise<any[]> {
+    const filter: Record<string, unknown> = {};
+    const now = new Date();
+    const status = this.getStatusFilter(options.estado);
+    const sort = this.getSort(options.sort);
+    const categoria = options.categoria?.trim();
+    const ciudad = options.ciudad?.trim();
+
+    if (categoria) {
+      filter.categoria = categoria;
+    }
+
+    if (ciudad) {
+      filter.ciudad = { $regex: this.escapeRegex(ciudad), $options: 'i' };
+    }
+
+    if (status === 'futuras') {
+      filter.$or = [{ fecha: { $gte: now } }, { fecha: { $exists: false } }, { fecha: null }];
+    } else if (status === 'pasadas') {
+      filter.fecha = { $lt: now };
+    }
+
+    let query = this.activityModel.find(filter);
+    if (sort === 'createdDesc') {
+      query = query.sort({ createdAt: -1 });
+    } else if (sort === 'createdAsc') {
+      query = query.sort({ createdAt: 1 });
+    }
+
+    const activities = await query.exec();
+    return this.hydrateActivities(sort === 'fechaAsc' ? this.sortActivitiesByDateAsc(activities) : activities);
   }
 
   async findById(id: string): Promise<any> {
@@ -135,17 +216,105 @@ export class ActivitiesService {
       throw new ForbiddenException('No puedes unirte a esta actividad');
     }
 
-    if ((activity.participantes ?? []).some((participante) => participante.toString() === usuarioId)) {
-      throw new BadRequestException('El usuario ya esta apuntado a esta actividad');
+    if (this.hasUser(activity.participantes, usuarioId)) {
+      throw new BadRequestException('Ya participas en esta actividad');
+    }
+
+    if (this.hasUser(activity.solicitudesPendientes, usuarioId)) {
+      throw new BadRequestException('Ya tienes una solicitud pendiente');
+    }
+
+    activity.solicitudesPendientes = [
+      ...(activity.solicitudesPendientes ?? []),
+      new Types.ObjectId(usuarioId),
+    ];
+    activity.solicitudesRechazadas = this.removeUser(activity.solicitudesRechazadas, usuarioId);
+    await activity.save();
+
+    const requester = await this.userModel.findById(usuarioId).select('nombre email').lean().exec();
+    await this.notificationsService.create({
+      recipientId: activity.creador.toString(),
+      actorId: usuarioId,
+      activityId: id,
+      type: 'activity_request_created',
+      message: `${requester?.nombre ?? requester?.email ?? 'Un usuario'} ha solicitado unirse a tu actividad ${activity.titulo}`,
+    });
+
+    return this.findById(id);
+  }
+
+  async acceptJoinRequest(id: string, userId: string, requesterId: string): Promise<any> {
+    const activity = await this.activityModel.findById(id).exec();
+
+    if (!activity) {
+      throw new NotFoundException(`Actividad con ID ${id} no encontrada`);
+    }
+
+    if (activity.creador.toString() !== requesterId) {
+      throw new ForbiddenException('Solo el creador puede aceptar solicitudes');
+    }
+
+    if (!this.hasUser(activity.solicitudesPendientes, userId)) {
+      throw new BadRequestException('El usuario no tiene una solicitud pendiente');
+    }
+
+    if (this.hasUser(activity.participantes, userId)) {
+      throw new BadRequestException('El usuario ya participa en esta actividad');
     }
 
     if ((activity.participantes ?? []).length >= activity.plazas) {
       throw new BadRequestException('No hay plazas disponibles en esta actividad');
     }
 
-    activity.participantes = [...(activity.participantes ?? []), new Types.ObjectId(usuarioId)];
-    activity.salidas = (activity.salidas ?? []).filter((user) => user.toString() !== usuarioId);
+    activity.solicitudesPendientes = this.removeUser(activity.solicitudesPendientes, userId);
+    activity.solicitudesRechazadas = this.removeUser(activity.solicitudesRechazadas, userId);
+    activity.salidas = this.removeUser(activity.salidas, userId);
+    activity.participantes = [...(activity.participantes ?? []), new Types.ObjectId(userId)];
     await activity.save();
+
+    await this.notificationsService.create({
+      recipientId: userId,
+      actorId: requesterId,
+      activityId: id,
+      type: 'activity_request_accepted',
+      message: `Tu solicitud para ${activity.titulo} ha sido aceptada`,
+    });
+
+    return this.findById(id);
+  }
+
+  async rejectJoinRequest(id: string, userId: string, requesterId: string): Promise<any> {
+    const activity = await this.activityModel.findById(id).exec();
+
+    if (!activity) {
+      throw new NotFoundException(`Actividad con ID ${id} no encontrada`);
+    }
+
+    if (activity.creador.toString() !== requesterId) {
+      throw new ForbiddenException('Solo el creador puede rechazar solicitudes');
+    }
+
+    if (!this.hasUser(activity.solicitudesPendientes, userId)) {
+      throw new BadRequestException('El usuario no tiene una solicitud pendiente');
+    }
+
+    activity.solicitudesPendientes = this.removeUser(activity.solicitudesPendientes, userId);
+    if (!this.hasUser(activity.solicitudesRechazadas, userId)) {
+      activity.solicitudesRechazadas = [
+        ...(activity.solicitudesRechazadas ?? []),
+        new Types.ObjectId(userId),
+      ];
+    }
+    await activity.save();
+
+    await this.notificationsService.create({
+      recipientId: userId,
+      actorId: requesterId,
+      activityId: id,
+      type: 'activity_request_rejected',
+      message: `Tu solicitud para ${activity.titulo} ha sido rechazada`,
+    });
+
     return this.findById(id);
   }
 

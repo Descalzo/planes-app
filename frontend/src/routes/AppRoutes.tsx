@@ -9,6 +9,7 @@ import ActivityChatPage from '../pages/ActivityChatPage';
 import ProfilePage from '../pages/ProfilePage';
 import UserPublicProfilePage from '../pages/UserPublicProfilePage';
 import EditActivityPage from '../pages/EditActivityPage';
+import NotificationsPage from '../pages/NotificationsPage';
 import { getAuthToken } from '../services/api';
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
@@ -46,6 +47,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <NotificationsPage />
           </ProtectedRoute>
         }
       />

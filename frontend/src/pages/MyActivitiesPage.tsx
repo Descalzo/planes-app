@@ -35,7 +35,10 @@ export default function MyActivitiesPage() {
 
     async function loadPageData() {
       try {
-        const [activitiesData, userData] = await Promise.all([fetchActivities(), fetchCurrentUser()]);
+        const [activitiesData, userData] = await Promise.all([
+          fetchActivities({ estado: 'todas', sort: 'fechaAsc' }),
+          fetchCurrentUser(),
+        ]);
         if (isMounted) {
           setActivities(activitiesData);
           setCurrentUser(userData);
@@ -161,24 +164,33 @@ export default function MyActivitiesPage() {
           <p>{emptyMessages[view]}</p>
         )}
         <div className="activity-grid">
-          {visibleActivities.map((activity) => (
-            <ActivityCard
-              key={activity._id}
-              id={activity._id}
-              title={activity.titulo}
-              category={activity.categoria}
-              city={activity.ciudad}
-              spots={activity.plazas}
-              imagenUrl={activity.imagenUrl}
-              participants={getActivityParticipantsCount(activity, currentUserId)}
-              isJoined={Boolean(currentUserId && isUserInActivity(activity, currentUserId))}
-              isCreator={Boolean(currentUserId && isActivityCreator(activity, currentUserId))}
-              isRemoved={Boolean(currentUserId && isUserRemovedFromActivity(activity, currentUserId))}
-              hasActivityUpdates={Boolean(currentUserId && isActivityCreator(activity, currentUserId) && hasActivityUpdates(activity, currentUserId))}
-              hasUnreadMessages={unreadMessageActivityIds.has(activity._id)}
-              leftUsersCount={currentUserId && isActivityCreator(activity, currentUserId) ? activity.salidas?.length ?? 0 : 0}
-            />
-          ))}
+          {visibleActivities.map((activity) => {
+            const hasCreatorUpdates = Boolean(
+              currentUserId &&
+              isActivityCreator(activity, currentUserId) &&
+              hasActivityUpdates(activity, currentUserId)
+            );
+
+            return (
+              <ActivityCard
+                key={activity._id}
+                id={activity._id}
+                title={activity.titulo}
+                category={activity.categoria}
+                city={activity.ciudad}
+                date={activity.fecha}
+                spots={activity.plazas}
+                imagenUrl={activity.imagenUrl}
+                participants={getActivityParticipantsCount(activity, currentUserId)}
+                isJoined={Boolean(currentUserId && isUserInActivity(activity, currentUserId))}
+                isCreator={Boolean(currentUserId && isActivityCreator(activity, currentUserId))}
+                isRemoved={Boolean(currentUserId && isUserRemovedFromActivity(activity, currentUserId))}
+                hasActivityUpdates={hasCreatorUpdates}
+                hasUnreadMessages={unreadMessageActivityIds.has(activity._id)}
+                leftUsersCount={hasCreatorUpdates ? activity.salidas?.length ?? 0 : 0}
+              />
+            );
+          })}
         </div>
       </section>
     </main>

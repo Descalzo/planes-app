@@ -22,6 +22,23 @@ function getAuthorId(message: Message): string | null {
   return typeof message.author === 'string' ? message.author : null;
 }
 
+function getErrorMessage(error: unknown) {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const response = (error as { response?: { status?: number; data?: { message?: string | string[] } } }).response;
+    if (response?.status === 401) {
+      return 'Debes iniciar sesion para ver este chat';
+    }
+    if (response?.status === 403) {
+      return 'Solo el organizador y los participantes aceptados pueden acceder al chat general';
+    }
+
+    const message = response?.data?.message;
+    return Array.isArray(message) ? message.join(', ') : message ?? 'No se pudieron cargar los mensajes';
+  }
+
+  return 'No se pudieron cargar los mensajes';
+}
+
 export default function MessageList({ activityId, refreshKey, currentUserId }: MessageListProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,9 +67,9 @@ export default function MessageList({ activityId, refreshKey, currentUserId }: M
           markChatSeen(activityId, currentUserId, data);
           setError(null);
         }
-      } catch {
+      } catch (caughtError) {
         if (isMounted) {
-          setError('No se pudieron cargar los mensajes');
+          setError(getErrorMessage(caughtError));
         }
       } finally {
         if (isMounted) {

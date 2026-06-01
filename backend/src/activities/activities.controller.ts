@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiParam, ApiTags } from '@nestjs/swagger';
 import { ActivitiesService } from './activities.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
@@ -20,8 +20,13 @@ export class ActivitiesController {
   }
 
   @Get()
-  findAll() {
-    return this.activitiesService.findAll();
+  findAll(
+    @Query('categoria') categoria?: string,
+    @Query('ciudad') ciudad?: string,
+    @Query('estado') estado?: string,
+    @Query('sort') sort?: string,
+  ) {
+    return this.activitiesService.findAll({ categoria, ciudad, estado, sort });
   }
 
   @Get(':id')
@@ -48,6 +53,32 @@ export class ActivitiesController {
   @ApiParam({ name: 'id', description: 'ID de la actividad', type: String })
   joinActivity(@Param('id', ParseObjectIdPipe) id: string, @CurrentUser() user: { id: string }) {
     return this.activitiesService.joinActivity(id, user.id);
+  }
+
+  @Patch(':id/requests/:userId/accept')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiParam({ name: 'id', description: 'ID de la actividad', type: String })
+  @ApiParam({ name: 'userId', description: 'ID del usuario solicitante', type: String })
+  acceptJoinRequest(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Param('userId', ParseObjectIdPipe) userId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.activitiesService.acceptJoinRequest(id, userId, user.id);
+  }
+
+  @Patch(':id/requests/:userId/reject')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiParam({ name: 'id', description: 'ID de la actividad', type: String })
+  @ApiParam({ name: 'userId', description: 'ID del usuario solicitante', type: String })
+  rejectJoinRequest(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Param('userId', ParseObjectIdPipe) userId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.activitiesService.rejectJoinRequest(id, userId, user.id);
   }
 
   @Patch(':id/leave')

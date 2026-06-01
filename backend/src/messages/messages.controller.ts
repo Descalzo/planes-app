@@ -24,8 +24,13 @@ export class MessagesController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
   @ApiParam({ name: 'activityId', description: 'ID de la actividad', type: String })
-  findByActivity(@Param('activityId', ParseObjectIdPipe) activityId: string) {
-    return this.messagesService.findByActivity(activityId);
+  findByActivity(
+    @Param('activityId', ParseObjectIdPipe) activityId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.messagesService.findByActivity(activityId, user.id);
   }
 }

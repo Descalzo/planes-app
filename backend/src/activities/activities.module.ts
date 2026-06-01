@@ -5,6 +5,7 @@ import { ActivitiesService } from './activities.service';
 import { Activity, ActivitySchema } from './schemas/activity.schema';
 import { AuthModule } from '../auth/auth.module';
 import { User, UserSchema } from '../users/schemas/user.schema';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { User, UserSchema } from '../users/schemas/user.schema';
       { name: User.name, schema: UserSchema },
     ]),
     AuthModule,
+    NotificationsModule,
   ],
   controllers: [ActivitiesController],
   providers: [ActivitiesService],

@@ -24,6 +24,7 @@ export default defineConfig({
     proxy: {
       '/users':      backendProxy,
       '/activities': backendProxy,
+      '/notifications': backendProxy,
     },
   },
   preview: {
@@ -32,6 +33,7 @@ export default defineConfig({
     proxy: {
       '/users':      backendProxy,
       '/activities': backendProxy,
+      '/notifications': backendProxy,
     },
   },
 });

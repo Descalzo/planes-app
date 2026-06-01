@@ -6,6 +6,7 @@ interface ActivityCardProps {
   title: string;
   category?: string;
   city?: string;
+  date?: string;
   spots?: number;
   participants?: number;
   imagenUrl?: string;
@@ -22,6 +23,7 @@ export default function ActivityCard({
   title,
   category,
   city,
+  date,
   spots,
   participants = 0,
   imagenUrl,
@@ -33,6 +35,12 @@ export default function ActivityCard({
   leftUsersCount = 0,
 }: ActivityCardProps) {
   const availableSpots = typeof spots === 'number' ? Math.max(spots - participants, 0) : null;
+  const formattedDate = date
+    ? new Intl.DateTimeFormat('es-ES', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(new Date(date))
+    : 'Fecha por definir';
   const cardClassName = isRemoved
     ? 'activity-card activity-card--removed'
     : isJoined
@@ -79,6 +87,7 @@ export default function ActivityCard({
           </div>
         )}
         <h2>{title}</h2>
+        <p className="activity-card__date">{formattedDate}</p>
         <p className="activity-card__spots">
           {availableSpots === null
             ? `${participants} participantes`
