@@ -1,6 +1,6 @@
 # Continuidad del proyecto Planes
 
-Documento de estado real del proyecto. Última actualización: **v0.5-websockets** — chat en tiempo real con Socket.IO, sistema completo de notificaciones, favoritos ("Me gusta") y mejoras de moderación.
+Documento de estado real del proyecto. Última actualización: **v0.6-pwa** — PWA instalable (service worker + manifest + iconos), chat en tiempo real con Socket.IO, sistema completo de notificaciones, favoritos ("Me gusta") y mejoras de moderación.
 
 ---
 
@@ -57,8 +57,8 @@ El CORS del backend acepta por defecto:
 
 | Capa | Stack |
 |------|-------|
-| Backend | NestJS 11, TypeScript, Mongoose 8, MongoDB, Passport JWT, bcrypt, class-validator, Swagger, **@nestjs/websockets + socket.io** |
-| Frontend | React 18, Vite, TypeScript, React Router DOM 6, Axios, CSS nativo, **socket.io-client** |
+| Backend | NestJS 11, TypeScript, Mongoose 8, MongoDB, Passport JWT, bcrypt, class-validator, Swagger, @nestjs/websockets + socket.io |
+| Frontend | React 18, Vite, TypeScript, React Router DOM 6, Axios, CSS nativo, socket.io-client, **vite-plugin-pwa** (Workbox) |
 | Runtime | Node.js 20+, npm |
 
 ---
@@ -481,6 +481,76 @@ La ruta `GET /users/:id/public` aplica estas reglas:
 /profile                  → perfil propio
 /users/:id/profile        → perfil público
 ```
+
+### PWA (Progressive Web App)
+
+#### Archivos
+
+| Archivo | Descripción |
+|---------|-------------|
+| `public/icon.svg` | Icono fuente vectorial (fondo indigo + "P" blanca) |
+| `public/pwa-192x192.png` | Icono estándar 192×192 |
+| `public/pwa-512x512.png` | Icono estándar 512×512 |
+| `public/pwa-maskable-192x192.png` | Icono maskable 192×192 (full bleed, sin redondeo) |
+| `public/pwa-maskable-512x512.png` | Icono maskable 512×512 |
+| `public/favicon.png` | Favicon 64×64 |
+| `scripts/generate-icons.cjs` | Script Node.js (sharp) para regenerar iconos desde `icon.svg` |
+
+Regenerar iconos si se cambia el diseño:
+```powershell
+cd C:\proyectos\planes\frontend
+node scripts/generate-icons.cjs
+```
+
+#### Manifest (`manifest.webmanifest`)
+
+Generado automáticamente por `vite-plugin-pwa` en el build:
+
+```json
+{
+  "name": "Planes",
+  "short_name": "Planes",
+  "description": "App para encontrar planes y actividades con otras personas",
+  "theme_color": "#6366f1",
+  "background_color": "#f8fafc",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/",
+  "lang": "es"
+}
+```
+
+#### Service Worker (Workbox)
+
+- Estrategia `generateSW` (automática).
+- **Precachea** el shell de la app: JS, CSS, HTML, imágenes, fuentes.
+- **Network-only** para `/users`, `/activities`, `/notifications` y `/socket.io` — las llamadas API y WebSocket nunca se cachean.
+- `navigateFallback: 'index.html'` para que el enrutado SPA funcione offline (muestra la app aunque las API fallen).
+- `autoUpdate`: el SW se actualiza automáticamente cuando hay una nueva versión del build.
+
+#### HTTPS obligatorio
+
+Chrome Android exige HTTPS para registrar service workers y mostrar el prompt de instalación. `http://192.168.x.x` no activa ni el SW ni el banner.
+
+**Solución configurada**: `@vitejs/plugin-basic-ssl` hace que tanto `npm run dev` como `npm run preview` sirvan por **HTTPS** con un certificado autofirmado. El móvil mostrará una advertencia de seguridad la primera vez; hay que aceptarla (Configuración avanzada → Continuar).
+
+**Alternativa sin advertencias**: usar ngrok para un HTTPS válido:
+
+```powershell
+npm run preview        # sirve en https://0.0.0.0:4173
+npx ngrok http 4173    # en otra terminal → URL pública HTTPS
+```
+
+Abrir la URL `https://xxxx.ngrok.io` en el móvil. No hay advertencia y el prompt de instalación aparece inmediatamente.
+
+#### Cómo probar en Android
+
+1. `npm run build && npm run preview` — servidor HTTPS en `https://192.168.x.x:4173`
+2. En Chrome del móvil, abrir esa URL y aceptar la advertencia del certificado
+3. El banner "Añadir a pantalla de inicio" aparece en la parte inferior (o en menú ⋮ → *Instalar aplicación*)
+4. Al abrir desde el icono: pantalla completa, sin barra del navegador, barra de estado indigo
+
+---
 
 ### WebSockets (Socket.IO)
 
