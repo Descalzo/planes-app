@@ -464,4 +464,29 @@ export class ActivitiesService {
     await activity.save();
     return this.findById(id);
   }
+
+  async saveActivity(id: string, userId: string): Promise<{ ok: boolean }> {
+    const activity = await this.activityModel.findById(id).exec();
+    if (!activity) throw new NotFoundException(`Actividad con ID ${id} no encontrada`);
+    if (!this.hasUser(activity.guardadoPor, userId)) {
+      activity.guardadoPor = [...(activity.guardadoPor ?? []), new Types.ObjectId(userId)];
+      await activity.save();
+    }
+    return { ok: true };
+  }
+
+  async unsaveActivity(id: string, userId: string): Promise<{ ok: boolean }> {
+    const activity = await this.activityModel.findById(id).exec();
+    if (!activity) throw new NotFoundException(`Actividad con ID ${id} no encontrada`);
+    activity.guardadoPor = this.removeUser(activity.guardadoPor, userId);
+    await activity.save();
+    return { ok: true };
+  }
+
+  async getSavedActivities(userId: string): Promise<any[]> {
+    const activities = await this.activityModel
+      .find({ guardadoPor: new Types.ObjectId(userId) })
+      .exec();
+    return this.hydrateActivities(this.sortActivitiesByDateAsc(activities));
+  }
 }

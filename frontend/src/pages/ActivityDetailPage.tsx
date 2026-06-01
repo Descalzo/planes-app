@@ -7,6 +7,7 @@ import {
   getReferenceId,
   getReferenceName,
   isActivityCreator,
+  isActivitySavedByUser,
   isUserMutedInActivity,
   isUserPendingInActivity,
   isUserRejectedFromActivity,
@@ -17,8 +18,10 @@ import {
   muteActivityParticipant,
   rejectActivityRequest,
   removeActivityParticipant,
+  saveActivity,
   unbanActivityParticipant,
   unmuteActivityParticipant,
+  unsaveActivity,
 } from '../services/activityService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
 import { markActivitySeen, hasUnseenPrivateConversations } from '../services/notificationService';
@@ -54,6 +57,7 @@ export default function ActivityDetailPage() {
   const [unbanningParticipantId, setUnbanningParticipantId] = useState<string | null>(null);
   const [requestActionId, setRequestActionId] = useState<string | null>(null);
   const [privateConversations, setPrivateConversations] = useState<PrivateActivityConversation[]>([]);
+  const [isSaved, setIsSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -75,6 +79,7 @@ export default function ActivityDetailPage() {
           setCurrentUser(userData);
           viewerId = userData._id ?? userData.id ?? null;
           markActivitySeen(activityData._id, viewerId);
+          setIsSaved(isActivitySavedByUser(activityData, viewerId));
           setError(null);
         }
       } catch {
@@ -291,10 +296,37 @@ export default function ActivityDetailPage() {
   const pendingRequests = activity?.solicitudesPendientes ?? [];
   const mutedUsers = activity?.chatSilenciados ?? [];
 
+  async function handleToggleSave() {
+    if (!activityId) return;
+    const wasSaved = isSaved;
+    setIsSaved(!wasSaved);
+    try {
+      if (wasSaved) await unsaveActivity(activityId);
+      else await saveActivity(activityId);
+    } catch {
+      setIsSaved(wasSaved);
+    }
+  }
+
   return (
     <main className="page page--detail">
       <header>
         <h1>{activity?.titulo ?? 'Detalle de actividad'}</h1>
+        {activity && currentUserId && (
+          <button
+            className={`activity-card__save-btn detail-save-btn${isSaved ? ' activity-card__save-btn--saved' : ''}`}
+            type="button"
+            aria-label={isSaved ? 'Quitar de me gusta' : 'Me gusta'}
+            onClick={handleToggleSave}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+              fill={isSaved ? '#f43f5e' : 'none'}
+              stroke={isSaved ? '#f43f5e' : 'currentColor'}
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+            </svg>
+          </button>
+        )}
       </header>
       <section>
         {isLoading && <p>Cargando actividad...</p>}

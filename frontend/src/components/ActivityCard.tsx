@@ -1,6 +1,24 @@
 import { Link } from 'react-router-dom';
 import { getCategoryVisual } from '../utils/activityImages';
 
+function HeartIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill={filled ? '#f43f5e' : 'none'}
+      stroke={filled ? '#f43f5e' : 'currentColor'}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+    </svg>
+  );
+}
+
 interface ActivityCardProps {
   id: string;
   title: string;
@@ -18,6 +36,8 @@ interface ActivityCardProps {
   hasActivityUpdates?: boolean;
   hasUnreadMessages?: boolean;
   leftUsersCount?: number;
+  isSaved?: boolean;
+  onToggleSave?: () => void;
 }
 
 export default function ActivityCard({
@@ -37,6 +57,8 @@ export default function ActivityCard({
   hasActivityUpdates = false,
   hasUnreadMessages = false,
   leftUsersCount = 0,
+  isSaved = false,
+  onToggleSave,
 }: ActivityCardProps) {
   const totalSpots = typeof spots === 'number' ? spots : 10;
   const usedSpots = typeof occupiedSpots === 'number' ? occupiedSpots : participants;
@@ -58,24 +80,40 @@ export default function ActivityCard({
 
   return (
     <article className={cardClassName}>
-      {imagenUrl ? (
-        <img
-          className="activity-card__image"
-          src={imagenUrl}
-          alt={title}
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).style.display = 'none';
-          }}
-        />
-      ) : (
-        <div
-          className="activity-card__image activity-card__image--placeholder"
-          style={{ background: visual.gradient }}
-          aria-hidden="true"
-        >
-          <span>{visual.emoji}</span>
-        </div>
-      )}
+      <div className="activity-card__media">
+        {imagenUrl ? (
+          <img
+            className="activity-card__image"
+            src={imagenUrl}
+            alt={title}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ) : (
+          <div
+            className="activity-card__image activity-card__image--placeholder"
+            style={{ background: visual.gradient }}
+            aria-hidden="true"
+          >
+            <span>{visual.emoji}</span>
+          </div>
+        )}
+        {onToggleSave && (
+          <button
+            className={`activity-card__save-btn${isSaved ? ' activity-card__save-btn--saved' : ''}`}
+            type="button"
+            aria-label={isSaved ? 'Quitar de me gusta' : 'Me gusta'}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleSave();
+            }}
+          >
+            <HeartIcon filled={isSaved} />
+          </button>
+        )}
+      </div>
       <div className="activity-card__content">
         <div className="activity-card__topline">
           <p className="activity-card__meta">{[category, city].filter(Boolean).join(' · ') || 'Sin categoria'}</p>

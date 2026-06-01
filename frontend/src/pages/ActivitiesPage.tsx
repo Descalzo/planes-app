@@ -6,8 +6,12 @@ import {
   ActivitySort,
   ActivityStatusFilter,
   fetchActivities,
+  fetchSavedActivities,
+  saveActivity,
+  unsaveActivity,
   getActivityParticipantsCount,
   isActivityCreator,
+  isActivitySavedByUser,
   isUserRemovedFromActivity,
   isUserInActivity,
 } from '../services/activityService';
@@ -36,6 +40,7 @@ export default function ActivitiesPage() {
   const [cityFilter, setCityFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<ActivityStatusFilter>('futuras');
   const [sort, setSort] = useState<ActivitySort>('fechaAsc');
+  const [savedActivityIds, setSavedActivityIds] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +51,7 @@ export default function ActivitiesPage() {
 
     async function loadPageData() {
       try {
-        const [activitiesData, userData] = await Promise.all([
+        const [activitiesData, userData, savedData] = await Promise.all([
           fetchActivities({
             categoria: selectedCategory,
             ciudad: cityFilter.trim(),
@@ -54,10 +59,12 @@ export default function ActivitiesPage() {
             sort,
           }),
           fetchCurrentUser(),
+          fetchSavedActivities().catch(() => [] as Activity[]),
         ]);
         if (isMounted) {
           setActivities(activitiesData);
           setCurrentUser(userData);
+          setSavedActivityIds(new Set(savedData.map((a) => a._id)));
           setError(null);
         }
       } catch {
@@ -86,6 +93,27 @@ export default function ActivitiesPage() {
   }, [selectedCategory, cityFilter, statusFilter, sort]);
 
   const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
+
+  async function handleToggleSave(activityId: string) {
+    const isSaved = savedActivityIds.has(activityId);
+    setSavedActivityIds((prev) => {
+      const next = new Set(prev);
+      if (isSaved) next.delete(activityId);
+      else next.add(activityId);
+      return next;
+    });
+    try {
+      if (isSaved) await unsaveActivity(activityId);
+      else await saveActivity(activityId);
+    } catch {
+      setSavedActivityIds((prev) => {
+        const next = new Set(prev);
+        if (isSaved) next.add(activityId);
+        else next.delete(activityId);
+        return next;
+      });
+    }
+  }
   const sectionTitle = selectedCategory || cityFilter.trim()
     ? 'Resultados filtrados'
     : statusFilter === 'pasadas'
@@ -239,6 +267,8 @@ export default function ActivitiesPage() {
                 hasActivityUpdates={hasCreatorUpdates}
                 hasUnreadMessages={unreadMessageActivityIds.has(activity._id)}
                 leftUsersCount={hasCreatorUpdates ? activity.salidas?.length ?? 0 : 0}
+                isSaved={savedActivityIds.has(activity._id)}
+                onToggleSave={currentUserId ? () => handleToggleSave(activity._id) : undefined}
               />
             );
           })}

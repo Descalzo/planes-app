@@ -29,6 +29,13 @@ export class ActivitiesController {
     return this.activitiesService.findAll({ categoria, ciudad, estado, sort });
   }
 
+  @Get('saved')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  getSaved(@CurrentUser() user: { id: string }) {
+    return this.activitiesService.getSavedActivities(user.id);
+  }
+
   @Get(':id')
   @ApiParam({ name: 'id', description: 'ID de la actividad', type: String })
   findById(@Param('id', ParseObjectIdPipe) id: string) {
@@ -45,6 +52,22 @@ export class ActivitiesController {
     @CurrentUser() user: { id: string },
   ) {
     return this.activitiesService.update(id, updateActivityDto, user.id);
+  }
+
+  @Patch(':id/save')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiParam({ name: 'id', description: 'ID de la actividad', type: String })
+  saveActivity(@Param('id', ParseObjectIdPipe) id: string, @CurrentUser() user: { id: string }) {
+    return this.activitiesService.saveActivity(id, user.id);
+  }
+
+  @Patch(':id/unsave')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiParam({ name: 'id', description: 'ID de la actividad', type: String })
+  unsaveActivity(@Param('id', ParseObjectIdPipe) id: string, @CurrentUser() user: { id: string }) {
+    return this.activitiesService.unsaveActivity(id, user.id);
   }
 
   @Patch(':id/join')

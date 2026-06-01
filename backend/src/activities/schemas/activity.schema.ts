@@ -42,6 +42,9 @@ export class Activity {
   @Prop({ type: [{ type: Types.ObjectId, ref: User.name }], default: [] })
   chatSilenciados: Types.ObjectId[];
 
+  @Prop({ type: [{ type: Types.ObjectId, ref: User.name }], default: [] })
+  guardadoPor: Types.ObjectId[];
+
   @Prop()
   imagenUrl?: string;
 

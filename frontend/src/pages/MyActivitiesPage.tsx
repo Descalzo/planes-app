@@ -4,6 +4,9 @@ import ActivityCard from '../components/ActivityCard';
 import {
   Activity,
   fetchActivities,
+  fetchSavedActivities,
+  saveActivity,
+  unsaveActivity,
   getActivityParticipantsCount,
   isActivityCreator,
   isUserRemovedFromActivity,
@@ -13,16 +16,19 @@ import { CurrentUser, fetchCurrentUser } from '../services/authService';
 import { fetchMessages } from '../services/messageService';
 import { hasActivityUpdates, hasUnreadMessages } from '../services/notificationService';
 
-type View = 'todas' | 'creadas' | 'unidas';
+type View = 'todas' | 'creadas' | 'unidas' | 'meGustan';
 
 const VIEW_LABELS: Record<View, string> = {
-  todas:   'Todas',
-  creadas: 'Creadas por mí',
-  unidas:  'A las que me uní',
+  todas:    'Todas',
+  creadas:  'Creadas por mí',
+  unidas:   'A las que me uní',
+  meGustan: 'Me gustan',
 };
 
 export default function MyActivitiesPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [savedActivities, setSavedActivities] = useState<Activity[]>([]);
+  const [savedActivityIds, setSavedActivityIds] = useState<Set<string>>(new Set());
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [unreadMessageActivityIds, setUnreadMessageActivityIds] = useState<Set<string>>(new Set());
   const [view, setView] = useState<View>('todas');
@@ -35,13 +41,16 @@ export default function MyActivitiesPage() {
 
     async function loadPageData() {
       try {
-        const [activitiesData, userData] = await Promise.all([
+        const [activitiesData, userData, savedData] = await Promise.all([
           fetchActivities({ estado: 'todas', sort: 'fechaAsc' }),
           fetchCurrentUser(),
+          fetchSavedActivities().catch(() => [] as Activity[]),
         ]);
         if (isMounted) {
           setActivities(activitiesData);
           setCurrentUser(userData);
+          setSavedActivities(savedData);
+          setSavedActivityIds(new Set(savedData.map((a) => a._id)));
           setError(null);
         }
       } catch {
@@ -81,10 +90,11 @@ export default function MyActivitiesPage() {
 
   const visibleActivities = useMemo(() => {
     if (!currentUserId) return [];
-    if (view === 'creadas') return myActivities.filter((a) => isActivityCreator(a, currentUserId));
-    if (view === 'unidas')  return myActivities.filter((a) => !isActivityCreator(a, currentUserId));
+    if (view === 'creadas')  return myActivities.filter((a) => isActivityCreator(a, currentUserId));
+    if (view === 'unidas')   return myActivities.filter((a) => !isActivityCreator(a, currentUserId));
+    if (view === 'meGustan') return savedActivities;
     return myActivities;
-  }, [myActivities, currentUserId, view]);
+  }, [myActivities, savedActivities, currentUserId, view]);
 
   useEffect(() => {
     if (!currentUserId || myActivities.length === 0) {
@@ -119,10 +129,35 @@ export default function MyActivitiesPage() {
     };
   }, [myActivities, currentUserId]);
 
+  async function handleToggleSave(activityId: string) {
+    const isSaved = savedActivityIds.has(activityId);
+    setSavedActivityIds((prev) => {
+      const next = new Set(prev);
+      if (isSaved) next.delete(activityId);
+      else next.add(activityId);
+      return next;
+    });
+    if (isSaved) {
+      setSavedActivities((prev) => prev.filter((a) => a._id !== activityId));
+    }
+    try {
+      if (isSaved) await unsaveActivity(activityId);
+      else await saveActivity(activityId);
+    } catch {
+      setSavedActivityIds((prev) => {
+        const next = new Set(prev);
+        if (isSaved) next.add(activityId);
+        else next.delete(activityId);
+        return next;
+      });
+    }
+  }
+
   const emptyMessages: Record<View, string> = {
-    todas:   'No tienes actividades creadas ni a las que te hayas unido.',
-    creadas: 'No has creado ninguna actividad todavia.',
-    unidas:  'No te has unido a ninguna actividad todavia.',
+    todas:    'No tienes actividades creadas ni a las que te hayas unido.',
+    creadas:  'No has creado ninguna actividad todavia.',
+    unidas:   'No te has unido a ninguna actividad todavia.',
+    meGustan: 'No has marcado ninguna actividad como me gusta todavia.',
   };
 
   return (
@@ -190,6 +225,8 @@ export default function MyActivitiesPage() {
                 hasActivityUpdates={hasCreatorUpdates}
                 hasUnreadMessages={unreadMessageActivityIds.has(activity._id)}
                 leftUsersCount={hasCreatorUpdates ? activity.salidas?.length ?? 0 : 0}
+                isSaved={savedActivityIds.has(activity._id)}
+                onToggleSave={currentUserId ? () => handleToggleSave(activity._id) : undefined}
               />
             );
           })}

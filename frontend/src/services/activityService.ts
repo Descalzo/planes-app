@@ -19,6 +19,7 @@ export interface Activity {
   expulsados?: EntityReference[];
   salidas?: EntityReference[];
   chatSilenciados?: EntityReference[];
+  guardadoPor?: string[];
   creador?: EntityReference;
   createdAt?: string;
   updatedAt?: string;
@@ -115,6 +116,27 @@ export async function muteActivityParticipant(activityId: string, participantId:
 export async function unmuteActivityParticipant(activityId: string, participantId: string) {
   const response = await api.patch<Activity>(`/activities/${activityId}/participants/${participantId}/unmute`, {});
   return response.data;
+}
+
+export async function saveActivity(activityId: string) {
+  await api.patch(`/activities/${activityId}/save`, {});
+}
+
+export async function unsaveActivity(activityId: string) {
+  await api.patch(`/activities/${activityId}/unsave`, {});
+}
+
+export async function fetchSavedActivities() {
+  const response = await api.get<Activity[]>('/activities/saved');
+  return response.data;
+}
+
+export function isActivitySavedByUser(activity: Activity, userId: string | null | undefined) {
+  if (!userId || !activity.guardadoPor) return false;
+  return activity.guardadoPor.some((id) => {
+    const refId = typeof id === 'string' ? id : (id as any)?._id ?? (id as any)?.id ?? id;
+    return refId === userId;
+  });
 }
 
 export function getReferenceId(reference: EntityReference) {
