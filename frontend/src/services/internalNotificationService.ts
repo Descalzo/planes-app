@@ -12,7 +12,7 @@ export interface InternalNotification {
     ciudad?: string;
     fecha?: string;
   };
-  type: 'activity_request_created' | 'activity_request_accepted' | 'activity_request_rejected' | 'activity_participant_left' | 'activity_participant_removed' | 'private_activity_message' | 'general_chat_message';
+  type: 'activity_request_created' | 'activity_request_accepted' | 'activity_request_rejected' | 'activity_participant_left' | 'activity_participant_removed' | 'activity_participant_unbanned' | 'private_activity_message' | 'general_chat_message';
   message: string;
   readAt?: string;
   createdAt?: string;

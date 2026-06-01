@@ -419,6 +419,15 @@ export class ActivitiesService {
 
     activity.expulsados = (activity.expulsados ?? []).filter((user) => user.toString() !== participantId);
     await activity.save();
+
+    await this.notificationsService.create({
+      recipientId: participantId,
+      actorId: requesterId,
+      activityId: id,
+      type: 'activity_participant_unbanned',
+      message: `Has sido readmitido en la actividad "${activity.titulo}"`,
+    });
+
     return this.findById(id);
   }
 

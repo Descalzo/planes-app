@@ -9,6 +9,7 @@ export type NotificationType =
   | 'activity_request_rejected'
   | 'activity_participant_left'
   | 'activity_participant_removed'
+  | 'activity_participant_unbanned'
   | 'private_activity_message'
   | 'general_chat_message';
 
