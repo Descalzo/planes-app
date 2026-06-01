@@ -1,6 +1,6 @@
 # Continuidad del proyecto Planes
 
-Documento de estado real del proyecto. Última actualización: base **v0.4-social-profiles** + filtros, ordenación, solicitudes, notificaciones internas y chat privado con organizador.
+Documento de estado real del proyecto. Última actualización: **v0.5-websockets** — chat en tiempo real con Socket.IO, sistema completo de notificaciones, favoritos ("Me gusta") y mejoras de moderación.
 
 ---
 
@@ -30,7 +30,8 @@ MongoDB (Mongoose)
 - El proxy de Vite reenvía `/users`, `/activities` y `/notifications` al backend. En producción se necesita un reverse proxy (nginx, etc.) o configurar `VITE_API_URL`.
 - Persistencia en MongoDB con Mongoose.
 - Autenticación JWT con header `Authorization: Bearer TOKEN`.
-- Notificaciones internas persistidas en MongoDB y refresco de estado en frontend con polling, sin WebSockets ni push reales.
+- Notificaciones internas persistidas en MongoDB con polling (5 s para contadores).
+- **Chat en tiempo real con Socket.IO**: el frontend se conecta via WebSocket (proxiado por Vite en dev) y recibe/envía mensajes sin polling. Polling HTTP a 30 s como fallback.
 
 ---
 
@@ -56,8 +57,8 @@ El CORS del backend acepta por defecto:
 
 | Capa | Stack |
 |------|-------|
-| Backend | NestJS 11, TypeScript, Mongoose 8, MongoDB, Passport JWT, bcrypt, class-validator, Swagger |
-| Frontend | React 18, Vite, TypeScript, React Router DOM 6, Axios, CSS nativo |
+| Backend | NestJS 11, TypeScript, Mongoose 8, MongoDB, Passport JWT, bcrypt, class-validator, Swagger, **@nestjs/websockets + socket.io** |
+| Frontend | React 18, Vite, TypeScript, React Router DOM 6, Axios, CSS nativo, **socket.io-client** |
 | Runtime | Node.js 20+, npm |
 
 ---
@@ -224,6 +225,7 @@ planes/
 | `MessagesModule` | Mensajes por actividad |
 | `NotificationsModule` | Notificaciones internas persistidas |
 | `PrivateActivityMessagesModule` | Chat privado entre usuario interesado y organizador |
+| `ChatModule` | **WebSocket Gateway** (Socket.IO) para chat general y privado en tiempo real |
 | `DatabaseModule` | Conexión MongoDB |
 
 ### Schemas
@@ -440,8 +442,8 @@ La ruta `GET /users/:id/public` aplica estas reglas:
 | `ActivityCard` | Card con imagen/placeholder por categoría, badges, notificaciones clicables. |
 | `ActivityForm` | Formulario de creación con selector de categoría e imagen. |
 | `AuthForm` | Login/registro. |
-| `MessageList` | Lista de mensajes con burbujas, polling cada 3 s, auto-scroll al fondo. |
-| `MessageInput` | Input de chat con botón icono de envío. |
+| `MessageList` | Lista de mensajes con burbujas, auto-scroll. Modo controlado (mensajes vía prop) o modo polling (30 s fallback). |
+| `MessageInput` | Input de chat con botón de envío. Acepta `onSend(text)` para modo WebSocket o `onSent()` para modo HTTP. |
 
 ### Servicios
 
@@ -450,10 +452,11 @@ La ruta `GET /users/:id/public` aplica estas reglas:
 | `api.ts` | Instancia Axios, `baseURL = ''` (proxy Vite), gestión del JWT en localStorage. |
 | `authService.ts` | Registro, login, usuario actual, perfil público. |
 | `activityService.ts` | CRUD actividades, solicitar plaza, aceptar/rechazar solicitudes, leave, remove/unban/mute/unmute, helpers de estado. |
-| `messageService.ts` | Listar y crear mensajes. |
+| `messageService.ts` | Listar y crear mensajes (HTTP). |
+| `socketService.ts` | **Singleton Socket.IO** — conecta al backend, gestiona reconexión. |
 | `notificationService.ts` | Marcas locales de visto por usuario+actividad en localStorage. |
 | `internalNotificationService.ts` | Listar notificaciones persistidas, contador sin leer y marcar como leída. |
-| `privateActivityChatService.ts` | Listar consultas privadas, leer conversación y enviar mensajes privados. |
+| `privateActivityChatService.ts` | Listar consultas privadas, leer conversación y enviar mensajes privados (HTTP fallback). |
 
 ### Utilidades
 
@@ -477,6 +480,57 @@ La ruta `GET /users/:id/public` aplica estas reglas:
 /notifications            → notificaciones internas
 /profile                  → perfil propio
 /users/:id/profile        → perfil público
+```
+
+### WebSockets (Socket.IO)
+
+#### Configuración
+
+- **Backend**: `ChatGateway` en `backend/src/chat/chat.gateway.ts`, arranca en el mismo puerto que NestJS (3000).
+- **Frontend**: `socketService.ts` crea un socket singleton. La URL por defecto es `''` (mismo origen), lo que Vite proxea a `localhost:3000` via la entrada `/socket.io` del proxy con `ws: true`.
+- **Auth**: el cliente envía `socket.auth.token = JWT` en el handshake. El gateway verifica el token con `JwtService.verify()` y almacena el `userId` en `socket.data.userId`. Si el token falla, desconecta.
+
+#### Rooms
+
+| Room | Uso |
+|------|-----|
+| `activity:{activityId}` | Chat general de una actividad |
+| `private:{activityId}:{idMin}:{idMax}` | Chat privado (IDs ordenados léxicamente) |
+
+#### Eventos cliente → servidor
+
+| Evento | Payload | Descripción |
+|--------|---------|-------------|
+| `joinActivityChat` | `{ activityId }` | Validar acceso → entrar a la room del chat general |
+| `leaveActivityChat` | `{ activityId }` | Salir de la room |
+| `sendActivityMessage` | `{ activityId, text }` | Guardar en DB → emitir `newActivityMessage` |
+| `joinPrivateChat` | `{ activityId, otherUserId }` | Validar acceso → entrar a la room privada |
+| `leavePrivateChat` | `{ activityId, otherUserId }` | Salir de la room |
+| `sendPrivateMessage` | `{ activityId, text, receiverId? }` | Guardar en DB → emitir `newPrivateMessage` |
+
+#### Eventos servidor → cliente
+
+| Evento | Payload | Descripción |
+|--------|---------|-------------|
+| `newActivityMessage` | Objeto `Message` populado | Nuevo mensaje en el chat general |
+| `newPrivateMessage` | Objeto `PrivateActivityMessage` populado | Nuevo mensaje en el chat privado |
+
+#### Permisos
+
+- `joinActivityChat`: el usuario debe ser creador o participante aceptado (misma lógica que HTTP).
+- `sendActivityMessage`: respeta `chatSilenciados` (mute), devuelve `WsException` si está silenciado.
+- `joinPrivateChat`: creador puede unirse con cualquier participante; participante solo con el creador.
+- Si el token es inválido, el socket se desconecta en `handleConnection`.
+
+#### Fallback HTTP
+
+Los endpoints HTTP de mensajes siguen activos. Si el socket no está conectado, `MessageInput` usa HTTP y `MessageList` tiene polling a 30 s. Los mensajes enviados por HTTP **no** se emiten por WebSocket (el cliente que los envió los tiene en estado local; otros clientes los verán en el próximo poll o cuando se conecten).
+
+#### Variables de entorno relacionadas
+
+```env
+# frontend/.env (opcional; por defecto '' = mismo origen proxiado)
+VITE_SOCKET_URL=http://localhost:3000
 ```
 
 ### Categorías predefinidas

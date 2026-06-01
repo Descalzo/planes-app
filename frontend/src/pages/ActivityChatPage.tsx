@@ -1,20 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import MessageInput from '../components/MessageInput';
 import MessageList from '../components/MessageList';
 import { Activity, fetchActivity, isActivityCreator, isUserInActivity } from '../services/activityService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
-import { markGeneralChatActive } from '../services/messageService';
+import { fetchMessages, Message, markGeneralChatActive } from '../services/messageService';
 import { markMessagesReadByActivity } from '../services/internalNotificationService';
+import { getSocket } from '../services/socketService';
 
 export default function ActivityChatPage() {
   const navigate = useNavigate();
   const { activityId } = useParams();
-  const [refreshKey, setRefreshKey] = useState(0);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [activity, setActivity] = useState<Activity | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [socketConnected, setSocketConnected] = useState(false);
+  const seenIds = useRef(new Set<string>());
+
   const currentActivityId = activityId ?? '';
   const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
   const canAccessChat = Boolean(
@@ -23,6 +27,7 @@ export default function ActivityChatPage() {
     (isActivityCreator(activity, currentUserId) || isUserInActivity(activity, currentUserId)),
   );
 
+  // Initial load: activity, user, messages via HTTP
   useEffect(() => {
     if (!currentActivityId) {
       setIsLoading(false);
@@ -32,64 +37,105 @@ export default function ActivityChatPage() {
 
     let isMounted = true;
 
-    async function loadChatAccess() {
+    async function loadInitialData() {
       try {
-        const [activityData, userData] = await Promise.all([fetchActivity(currentActivityId), fetchCurrentUser()]);
+        const [activityData, userData, messagesData] = await Promise.all([
+          fetchActivity(currentActivityId),
+          fetchCurrentUser(),
+          fetchMessages(currentActivityId).catch(() => [] as Message[]),
+        ]);
         if (isMounted) {
           setActivity(activityData);
           setCurrentUser(userData);
+          messagesData.forEach((m) => seenIds.current.add(m._id));
+          setMessages(messagesData);
           setError(null);
         }
       } catch {
-        if (isMounted) {
-          setError('No se pudo comprobar tu acceso al chat');
-        }
+        if (isMounted) setError('No se pudo comprobar tu acceso al chat');
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (isMounted) setIsLoading(false);
       }
     }
 
-    loadChatAccess();
-
-    return () => {
-      isMounted = false;
-    };
+    loadInitialData();
+    return () => { isMounted = false; };
   }, [currentActivityId]);
 
+  // Mark notifications as read + keep active ping (suppresses push notifications)
   useEffect(() => {
     if (!currentActivityId) return;
-
     markMessagesReadByActivity(currentActivityId).catch(() => {});
     window.dispatchEvent(new Event('planes:messages-changed'));
 
     let isMounted = true;
     async function pingActive() {
-      try {
-        await markGeneralChatActive(currentActivityId);
-      } catch {
-        if (!isMounted) return;
-      }
+      try { await markGeneralChatActive(currentActivityId); } catch { if (!isMounted) return; }
     }
-
     pingActive();
     const intervalId = window.setInterval(pingActive, 8000);
+    return () => { isMounted = false; window.clearInterval(intervalId); };
+  }, [currentActivityId]);
+
+  // WebSocket setup — runs after access is confirmed
+  useEffect(() => {
+    if (!currentActivityId || !canAccessChat) return;
+
+    const socket = getSocket();
+
+    function onNewMessage(message: Message) {
+      if (seenIds.current.has(message._id)) return;
+      seenIds.current.add(message._id);
+      setMessages((prev) => [...prev, message]);
+    }
+
+    function joinRoom() {
+      socket.emit('joinActivityChat', { activityId: currentActivityId });
+      setSocketConnected(true);
+    }
+
+    if (socket.connected) {
+      joinRoom();
+    } else {
+      socket.once('connect', joinRoom);
+    }
+
+    socket.on('newActivityMessage', onNewMessage);
+    socket.on('connect', joinRoom);
+    socket.on('disconnect', () => setSocketConnected(false));
 
     return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
+      socket.emit('leaveActivityChat', { activityId: currentActivityId });
+      socket.off('newActivityMessage', onNewMessage);
+      socket.off('connect', joinRoom);
+      socket.off('disconnect');
+      setSocketConnected(false);
     };
-  }, [currentActivityId]);
+  }, [currentActivityId, canAccessChat]);
+
+  async function handleSend(text: string) {
+    const socket = getSocket();
+    if (!socket.connected) throw new Error('Sin conexion. Intenta de nuevo.');
+    return new Promise<void>((resolve, reject) => {
+      socket.emit(
+        'sendActivityMessage',
+        { activityId: currentActivityId, text },
+        (response: { ok?: boolean; error?: string }) => {
+          if (response?.error) reject(new Error(response.error));
+          else resolve();
+        },
+      );
+    });
+  }
 
   return (
     <main className="page page--chat">
       <header>
-        <button 
-          className="button button--ghost button--small" 
+        <button
+          className="button button--ghost button--small"
           onClick={() => navigate(`/activities/${activityId}`)}
         >
-          ← Volver a la actividad
+          Volver a la actividad
         </button>
         <h1>Chat de actividad</h1>
       </header>
@@ -102,8 +148,15 @@ export default function ActivityChatPage() {
       )}
       {!isLoading && !error && canAccessChat && (
         <>
-          <MessageList activityId={currentActivityId} currentUserId={currentUserId} refreshKey={refreshKey} />
-          <MessageInput activityId={currentActivityId} onSent={() => setRefreshKey((value) => value + 1)} />
+          <MessageList
+            activityId={currentActivityId}
+            currentUserId={currentUserId}
+            messages={messages}
+          />
+          <MessageInput
+            activityId={currentActivityId}
+            onSend={socketConnected ? handleSend : undefined}
+          />
         </>
       )}
     </main>

@@ -16,6 +16,7 @@ import {
 } from '../services/privateActivityChatService';
 import { markMessagesReadByActivity } from '../services/internalNotificationService';
 import { markPrivateChatSeen } from '../services/notificationService';
+import { getSocket } from '../services/socketService';
 
 function getErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
@@ -32,6 +33,7 @@ export default function PrivateActivityChatPage() {
   const { activityId, userId } = useParams();
   const navigate = useNavigate();
   const messagesBoxRef = useRef<HTMLElement | null>(null);
+  const seenIds = useRef(new Set<string>());
   const [activity, setActivity] = useState<Activity | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [messages, setMessages] = useState<PrivateActivityMessage[]>([]);
@@ -64,6 +66,7 @@ export default function PrivateActivityChatPage() {
         if (isMounted) {
           setActivity(activityData);
           setCurrentUser(userData);
+          messagesData.forEach((m) => seenIds.current.add(m._id));
           setMessages(messagesData);
           const viewerId = userData._id ?? userData.id ?? null;
           markPrivateChatSeen(currentActivityId, conversationUserId, viewerId);
@@ -115,6 +118,35 @@ export default function PrivateActivityChatPage() {
     };
   }, [currentActivityId, conversationUserId]);
 
+  // WebSocket: private chat real-time
+  useEffect(() => {
+    if (!currentActivityId || !conversationUserId) return;
+
+    const socket = getSocket();
+
+    function onNewPrivateMessage(message: PrivateActivityMessage) {
+      if (seenIds.current.has(message._id)) return;
+      seenIds.current.add(message._id);
+      setMessages((prev) => [...prev, message]);
+    }
+
+    function joinRoom() {
+      socket.emit('joinPrivateChat', { activityId: currentActivityId, otherUserId: conversationUserId });
+    }
+
+    if (socket.connected) joinRoom();
+    else socket.once('connect', joinRoom);
+
+    socket.on('newPrivateMessage', onNewPrivateMessage);
+    socket.on('connect', joinRoom);
+
+    return () => {
+      socket.emit('leavePrivateChat', { activityId: currentActivityId, otherUserId: conversationUserId });
+      socket.off('newPrivateMessage', onNewPrivateMessage);
+      socket.off('connect', joinRoom);
+    };
+  }, [currentActivityId, conversationUserId]);
+
   useEffect(() => {
     const messagesBox = messagesBoxRef.current;
     if (!messagesBox) return;
@@ -129,12 +161,32 @@ export default function PrivateActivityChatPage() {
     setError(null);
     setIsSubmitting(true);
     try {
-      const message = await sendPrivateActivityMessage(
-        currentActivityId,
-        trimmedText,
-        isCreator ? conversationUserId : undefined,
-      );
-      setMessages((current) => [...current, message]);
+      const socket = getSocket();
+      let message: PrivateActivityMessage;
+
+      if (socket.connected) {
+        message = await new Promise<PrivateActivityMessage>((resolve, reject) => {
+          socket.emit(
+            'sendPrivateMessage',
+            { activityId: currentActivityId, text: trimmedText, receiverId: isCreator ? conversationUserId : undefined },
+            (response: { ok?: boolean; error?: string }) => {
+              if (response?.error) reject(new Error(response.error));
+              else resolve(null as unknown as PrivateActivityMessage);
+            },
+          );
+        });
+        // Message will arrive via newPrivateMessage WS event — no manual push needed
+      } else {
+        message = await sendPrivateActivityMessage(
+          currentActivityId,
+          trimmedText,
+          isCreator ? conversationUserId : undefined,
+        );
+        if (message && !seenIds.current.has(message._id)) {
+          seenIds.current.add(message._id);
+          setMessages((current) => [...current, message]);
+        }
+      }
       setText('');
     } catch (caughtError) {
       setError(getErrorMessage(caughtError));

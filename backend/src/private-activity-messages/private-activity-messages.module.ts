@@ -23,5 +23,6 @@ import {
   ],
   controllers: [PrivateActivityMessagesController],
   providers: [PrivateActivityMessagesService],
+  exports: [PrivateActivityMessagesService],
 })
 export class PrivateActivityMessagesModule {}

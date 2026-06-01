@@ -16,24 +16,32 @@ const backendProxy = {
   bypass: apiOnly,
 };
 
+const wsProxy = {
+  target: 'http://localhost:3000',
+  changeOrigin: true,
+  ws: true,
+};
+
 export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
     port: 4173,
     proxy: {
-      '/users':      backendProxy,
-      '/activities': backendProxy,
+      '/users':        backendProxy,
+      '/activities':   backendProxy,
       '/notifications': backendProxy,
+      '/socket.io':    wsProxy,
     },
   },
   preview: {
     host: true,
     port: 4173,
     proxy: {
-      '/users':      backendProxy,
-      '/activities': backendProxy,
+      '/users':        backendProxy,
+      '/activities':   backendProxy,
       '/notifications': backendProxy,
+      '/socket.io':    wsProxy,
     },
   },
 });

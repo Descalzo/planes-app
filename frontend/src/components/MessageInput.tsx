@@ -3,23 +3,20 @@ import { createMessage } from '../services/messageService';
 
 interface MessageInputProps {
   activityId: string;
-  onSent: () => void;
+  // Legacy: HTTP send + notify parent
+  onSent?: () => void;
+  // WebSocket mode: parent handles the send
+  onSend?: (text: string) => Promise<void>;
 }
 
 function getErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
     const response = (error as { response?: { status?: number; data?: { message?: string | string[] } } }).response;
-    if (response?.status === 401) {
-      return 'Debes iniciar sesion para enviar mensajes';
-    }
-    if (response?.status === 403) {
-      return 'No tienes permiso para escribir en este chat';
-    }
-
+    if (response?.status === 401) return 'Debes iniciar sesion para enviar mensajes';
+    if (response?.status === 403) return 'No tienes permiso para escribir en este chat';
     const message = response?.data?.message;
     return Array.isArray(message) ? message.join(', ') : message ?? 'No se pudo enviar el mensaje';
   }
-
   return 'No se pudo enviar el mensaje';
 }
 
@@ -32,7 +29,7 @@ function SendIcon() {
   );
 }
 
-export default function MessageInput({ activityId, onSent }: MessageInputProps) {
+export default function MessageInput({ activityId, onSent, onSend }: MessageInputProps) {
   const [text, setText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,18 +37,20 @@ export default function MessageInput({ activityId, onSent }: MessageInputProps) 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedText = text.trim();
-    if (!trimmedText || !activityId) {
-      return;
-    }
+    if (!trimmedText || !activityId) return;
 
     setError(null);
     setIsSubmitting(true);
     try {
-      await createMessage(activityId, { text: trimmedText });
+      if (onSend) {
+        await onSend(trimmedText);
+      } else {
+        await createMessage(activityId, { text: trimmedText });
+        onSent?.();
+      }
       setText('');
-      onSent();
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError));
+      setError(typeof caughtError === 'string' ? caughtError : getErrorMessage(caughtError));
     } finally {
       setIsSubmitting(false);
     }

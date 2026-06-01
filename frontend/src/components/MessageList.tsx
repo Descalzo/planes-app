@@ -4,8 +4,11 @@ import { markChatSeen } from '../services/notificationService';
 
 interface MessageListProps {
   activityId: string;
-  refreshKey: number;
   currentUserId?: string | null;
+  // When provided by parent (WebSocket mode), MessageList is purely a display component
+  messages?: Message[];
+  // Legacy polling mode: bump this to force a reload
+  refreshKey?: number;
 }
 
 function getAuthorName(message: Message) {
@@ -25,27 +28,26 @@ function getAuthorId(message: Message): string | null {
 function getErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
     const response = (error as { response?: { status?: number; data?: { message?: string | string[] } } }).response;
-    if (response?.status === 401) {
-      return 'Debes iniciar sesion para ver este chat';
-    }
-    if (response?.status === 403) {
-      return 'Solo el organizador y los participantes aceptados pueden acceder al chat general';
-    }
-
+    if (response?.status === 401) return 'Debes iniciar sesion para ver este chat';
+    if (response?.status === 403) return 'Solo el organizador y los participantes aceptados pueden acceder al chat general';
     const message = response?.data?.message;
     return Array.isArray(message) ? message.join(', ') : message ?? 'No se pudieron cargar los mensajes';
   }
-
   return 'No se pudieron cargar los mensajes';
 }
 
-export default function MessageList({ activityId, refreshKey, currentUserId }: MessageListProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export default function MessageList({ activityId, currentUserId, messages: externalMessages, refreshKey }: MessageListProps) {
+  const [internalMessages, setInternalMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(!externalMessages);
   const [error, setError] = useState<string | null>(null);
   const messagesBoxRef = useRef<HTMLElement | null>(null);
 
+  const controlled = externalMessages !== undefined;
+  const messages = controlled ? externalMessages : internalMessages;
+
+  // Self-fetch only in polling (uncontrolled) mode
   useEffect(() => {
+    if (controlled) return;
     if (!activityId) {
       setIsLoading(false);
       return;
@@ -56,42 +58,40 @@ export default function MessageList({ activityId, refreshKey, currentUserId }: M
     setError(null);
 
     async function loadMessages(showLoading = false) {
-      if (showLoading) {
-        setIsLoading(true);
-      }
-
+      if (showLoading) setIsLoading(true);
       try {
         const data = await fetchMessages(activityId);
         if (isMounted) {
-          setMessages(data);
+          setInternalMessages(data);
           markChatSeen(activityId, currentUserId, data);
           setError(null);
         }
       } catch (caughtError) {
-        if (isMounted) {
-          setError(getErrorMessage(caughtError));
-        }
+        if (isMounted) setError(getErrorMessage(caughtError));
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (isMounted) setIsLoading(false);
       }
     }
 
     loadMessages(true);
-    const intervalId = window.setInterval(() => loadMessages(), 3000);
+    const intervalId = window.setInterval(() => loadMessages(), 30000);
 
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
     };
-  }, [activityId, currentUserId, refreshKey]);
+  }, [activityId, currentUserId, refreshKey, controlled]);
+
+  // In controlled (WebSocket) mode, keep markChatSeen in sync so the
+  // "Mensajes nuevos" badge clears after visiting the chat.
+  useEffect(() => {
+    if (!controlled || !messages.length) return;
+    markChatSeen(activityId, currentUserId, messages);
+  }, [controlled, messages, activityId, currentUserId]);
 
   useEffect(() => {
     const messagesBox = messagesBoxRef.current;
-    if (!messagesBox) {
-      return;
-    }
+    if (!messagesBox) return;
     messagesBox.scrollTop = messagesBox.scrollHeight;
   }, [messages.length]);
 
@@ -109,9 +109,7 @@ export default function MessageList({ activityId, refreshKey, currentUserId }: M
               key={message._id}
               className={`message-bubble ${isOwn ? 'message-bubble--own' : 'message-bubble--other'}`}
             >
-              {!isOwn && (
-                <span className="message-bubble__author">{getAuthorName(message)}</span>
-              )}
+              {!isOwn && <span className="message-bubble__author">{getAuthorName(message)}</span>}
               <p className="message-bubble__text">{message.text}</p>
             </div>
           );

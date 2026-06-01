@@ -63,6 +63,7 @@ export class MessagesService {
     });
 
     const savedMessage = await newMessage.save();
+    await savedMessage.populate('author', 'nombre ciudad');
 
     const allParticipants = [
       activity.creador.toString(),
@@ -84,7 +85,13 @@ export class MessagesService {
       }
     }
 
-    return savedMessage;
+    return savedMessage as unknown as Message;
+  }
+
+  async checkChatAccess(activityId: string, userId: string): Promise<boolean> {
+    const activity = await this.activityModel.findById(activityId).exec();
+    if (!activity) return false;
+    return this.canAccessChat(activity, userId);
   }
 
   async findByActivity(activityId: string, userId: string): Promise<Message[]> {

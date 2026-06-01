@@ -153,6 +153,16 @@ export class PrivateActivityMessagesService {
     ]);
   }
 
+  async checkPrivateChatAccess(activityId: string, userId: string, otherUserId: string): Promise<boolean> {
+    const activity = await this.activityModel.findById(activityId).exec();
+    if (!activity) return false;
+    const creatorId = activity.creador.toString();
+    const participantIds = (activity.participantes ?? []).map((p) => p.toString());
+    if (userId === creatorId) return participantIds.includes(otherUserId);
+    if (otherUserId === creatorId) return participantIds.includes(userId);
+    return false;
+  }
+
   async markConversationActive(activityId: string, userId: string, requesterId: string) {
     await this.getActivity(activityId);
     // Marca al SOLICITANTE (quien está viendo) como activo, no a la conversación entera
