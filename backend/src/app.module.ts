@@ -11,6 +11,7 @@ import { AuthModule } from './auth/auth.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PrivateActivityMessagesModule } from './private-activity-messages/private-activity-messages.module';
 import { ChatModule } from './chat/chat.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ChatModule } from './chat/chat.module';
     NotificationsModule,
     PrivateActivityMessagesModule,
     ChatModule,
+    UploadsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

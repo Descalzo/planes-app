@@ -106,6 +106,9 @@ MONGODB_URI=mongodb+srv://usuario:password@cluster/db
 JWT_SECRET=un_secreto_largo_y_privado
 PORT=3000
 FRONTEND_URL=http://localhost:4173   # opcional; si no se define, acepta localhost y redes locales
+CLOUDINARY_CLOUD_NAME=tu_cloud_name
+CLOUDINARY_API_KEY=tu_api_key
+CLOUDINARY_API_SECRET=tu_api_secret
 ```
 
 `frontend/.env` (opcional, solo si no usas el proxy de Vite):
@@ -785,6 +788,17 @@ PrivateActivityMessage.receiver → User
 - No hay tests automáticos actualizados para los flujos nuevos.
 - Las marcas de visto viven en `localStorage`; si se cambia de usuario en el mismo navegador conviene cerrar sesión.
 - Datos legacy en MongoDB de versiones anteriores pueden tener campos inconsistentes; el backend tolera la mayoría de casos.
+
+---
+
+## Subida de imagenes
+
+- El backend expone `POST /uploads/image` con JWT y `multipart/form-data` (`file`).
+- La imagen se sube a Cloudinary y MongoDB guarda solo la URL devuelta (`secure_url`).
+- El frontend usa selector de archivos en perfil y en actividades, con preview antes de guardar.
+- Los campos `fotoPerfilUrl` e `imagenUrl` siguen aceptando URLs manuales para compatibilidad.
+- Si una actividad no tiene `imagenUrl`, la UI sigue usando la imagen local por categoria.
+- Limites actuales: JPG, PNG, WEBP o GIF; maximo 5 MB.
 
 ---
 

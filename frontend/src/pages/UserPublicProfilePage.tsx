@@ -10,10 +10,13 @@ function getInitials(name?: string) {
 export default function UserPublicProfilePage() {
   const navigate = useNavigate();
   const { userId } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [profile, setProfile] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isPhotoOpen = searchParams.get('photo') === '1';
+  const rawActivityId = searchParams.get('activityId');
+  const activityId = rawActivityId && rawActivityId !== 'undefined' && rawActivityId !== 'null' ? rawActivityId : undefined;
 
   useEffect(() => {
     if (!userId) {
@@ -21,9 +24,6 @@ export default function UserPublicProfilePage() {
       setError('Usuario no válido');
       return;
     }
-
-    const raw = searchParams.get('activityId');
-    const activityId = raw && raw !== 'undefined' && raw !== 'null' ? raw : undefined;
 
     async function loadProfile() {
       try {
@@ -40,7 +40,13 @@ export default function UserPublicProfilePage() {
     }
 
     loadProfile();
-  }, [userId, searchParams]);
+  }, [userId, activityId]);
+
+  function openPhoto() {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('photo', '1');
+    setSearchParams(nextParams);
+  }
 
   return (
     <main className="page page--profile">
@@ -59,7 +65,9 @@ export default function UserPublicProfilePage() {
         {profile && (
           <div className="profile-card">
             {profile.fotoPerfilUrl ? (
-              <img src={profile.fotoPerfilUrl} alt={profile.nombre} className="profile-card__photo" />
+              <button className="profile-card__photo-button" type="button" onClick={openPhoto}>
+                <img src={profile.fotoPerfilUrl} alt={profile.nombre} className="profile-card__photo" />
+              </button>
             ) : (
               <div className="profile-card__avatar" aria-hidden="true">
                 <span>{getInitials(profile.nombre)}</span>
@@ -95,6 +103,17 @@ export default function UserPublicProfilePage() {
           </div>
         )}
       </section>
+
+      {profile?.fotoPerfilUrl && isPhotoOpen && (
+        <div className="photo-viewer" role="dialog" aria-modal="true" aria-label={`Foto de ${profile.nombre}`}>
+          <header className="photo-viewer__bar">
+            <button className="button button--ghost button--small" type="button" onClick={() => navigate(-1)}>
+              Volver
+            </button>
+          </header>
+          <img className="photo-viewer__image" src={profile.fotoPerfilUrl} alt={profile.nombre} />
+        </div>
+      )}
     </main>
   );
 }

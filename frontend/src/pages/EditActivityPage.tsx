@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Activity, fetchActivity, updateActivity } from '../services/activityService';
 import { CATEGORIES } from '../utils/activityImages';
+import ImageUploadField from '../components/ImageUploadField';
 
 function getErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
@@ -33,6 +34,7 @@ export default function EditActivityPage() {
   const [spots, setSpots] = useState('');
   const [acceptedParticipants, setAcceptedParticipants] = useState(0);
   const [imagenUrl, setImagenUrl] = useState('');
+  const [isImageUploading, setIsImageUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,7 +130,7 @@ export default function EditActivityPage() {
           )}
         </label>
         <label>
-          Imagen (URL)
+          Imagen (URL opcional)
           <input
             type="url"
             value={imagenUrl}
@@ -136,15 +138,15 @@ export default function EditActivityPage() {
             placeholder="https://example.com/imagen.jpg"
           />
         </label>
-        {imagenUrl && (
-          <div className="image-preview">
-            <img
-              src={imagenUrl}
-              alt="Preview"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-            />
-          </div>
-        )}
+        <ImageUploadField
+          id="activity-image-upload"
+          label="Subir imagen"
+          value={imagenUrl}
+          previewAlt="Vista previa de la actividad"
+          onChange={setImagenUrl}
+          onError={setError}
+          onUploadingChange={setIsImageUploading}
+        />
         {error && <p role="alert">{error}</p>}
         <div className="form-actions">
           <button
@@ -154,8 +156,8 @@ export default function EditActivityPage() {
           >
             Cancelar
           </button>
-          <button className="button button--primary" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Guardando...' : 'Guardar cambios'}
+          <button className="button button--primary" type="submit" disabled={isSubmitting || isImageUploading}>
+            {isSubmitting ? 'Guardando...' : isImageUploading ? 'Subiendo imagen...' : 'Guardar cambios'}
           </button>
         </div>
       </form>

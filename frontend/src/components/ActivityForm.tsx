@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createActivity } from '../services/activityService';
 import { CATEGORIES } from '../utils/activityImages';
+import ImageUploadField from './ImageUploadField';
 
 function getErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
@@ -24,6 +25,7 @@ export default function ActivityForm() {
   const [date, setDate] = useState('');
   const [spots, setSpots] = useState('10');
   const [imagenUrl, setImagenUrl] = useState('');
+  const [isImageUploading, setIsImageUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,7 +81,7 @@ export default function ActivityForm() {
         <input min="1" type="number" value={spots} onChange={(e) => setSpots(e.target.value)} />
       </label>
       <label>
-        Imagen (URL)
+        Imagen (URL opcional)
         <input
           type="url"
           value={imagenUrl}
@@ -87,18 +89,18 @@ export default function ActivityForm() {
           placeholder="https://example.com/imagen.jpg"
         />
       </label>
-      {imagenUrl && (
-        <div className="image-preview">
-          <img
-            src={imagenUrl}
-            alt="Preview"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-          />
-        </div>
-      )}
+      <ImageUploadField
+        id="activity-image-upload"
+        label="Subir imagen"
+        value={imagenUrl}
+        previewAlt="Vista previa de la actividad"
+        onChange={setImagenUrl}
+        onError={setError}
+        onUploadingChange={setIsImageUploading}
+      />
       {error && <p role="alert">{error}</p>}
-      <button className="button button--primary" type="submit" disabled={isSubmitting}>
-        {isSubmitting ? 'Creando...' : 'Crear actividad'}
+      <button className="button button--primary" type="submit" disabled={isSubmitting || isImageUploading}>
+        {isSubmitting ? 'Creando...' : isImageUploading ? 'Subiendo imagen...' : 'Crear actividad'}
       </button>
     </form>
   );

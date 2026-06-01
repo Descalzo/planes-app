@@ -73,7 +73,7 @@ export default defineConfig({
         runtimeCaching: [
           {
             // API calls — network-first, no cache
-            urlPattern: /\/(users|activities|notifications)(\/|$)/,
+            urlPattern: /\/(users|activities|notifications|uploads)(\/|$)/,
             handler: 'NetworkOnly',
           },
           {
@@ -92,6 +92,7 @@ export default defineConfig({
       '/users':        backendProxy,
       '/activities':   backendProxy,
       '/notifications': backendProxy,
+      '/uploads':      backendProxy,
       '/socket.io':    wsProxy,
     },
   },
@@ -102,6 +103,7 @@ export default defineConfig({
       '/users':        backendProxy,
       '/activities':   backendProxy,
       '/notifications': backendProxy,
+      '/uploads':      backendProxy,
       '/socket.io':    wsProxy,
     },
   },

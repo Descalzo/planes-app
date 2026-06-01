@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { CurrentUser, fetchCurrentUser, updateCurrentUser } from '../services/authService';
+import ImageUploadField from '../components/ImageUploadField';
 
 function getErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
@@ -42,6 +43,7 @@ export default function ProfilePage() {
   const [edad, setEdad] = useState('');
   const [genero, setGenero] = useState('');
   const [instagram, setInstagram] = useState('');
+  const [isImageUploading, setIsImageUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -198,7 +200,7 @@ export default function ProfilePage() {
             />
           </label>
           <label>
-            URL de foto
+            URL de foto opcional
             <input
               type="url"
               value={fotoPerfilUrl}
@@ -206,6 +208,15 @@ export default function ProfilePage() {
               placeholder="https://example.com/foto.jpg"
             />
           </label>
+          <ImageUploadField
+            id="profile-image-upload"
+            label="Subir foto"
+            value={fotoPerfilUrl}
+            previewAlt={`Vista previa de ${nombre || 'usuario'}`}
+            onChange={setFotoPerfilUrl}
+            onError={setError}
+            onUploadingChange={setIsImageUploading}
+          />
           <div className="form-grid">
             <label>
               Edad
@@ -224,8 +235,8 @@ export default function ProfilePage() {
           {error && <p role="alert">{error}</p>}
           {success && <p className="form-success">{success}</p>}
 
-          <button className="button button--primary" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Guardando...' : 'Guardar cambios'}
+          <button className="button button--primary" type="submit" disabled={isSubmitting || isImageUploading}>
+            {isSubmitting ? 'Guardando...' : isImageUploading ? 'Subiendo imagen...' : 'Guardar cambios'}
           </button>
         </form>
       </section>
