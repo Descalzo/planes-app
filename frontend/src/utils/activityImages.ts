@@ -39,3 +39,27 @@ const DEFAULT_VISUAL: CategoryVisual = {
 export function getCategoryVisual(category?: string): CategoryVisual {
   return (category && CATEGORY_VISUALS[category]) || DEFAULT_VISUAL;
 }
+
+// Filenames in /public/images/categorias/
+const CATEGORY_DEFAULT_IMAGES: Record<string, string> = {
+  'Deporte y aire libre': '/images/categorias/deporte.png',
+  'Ocio y social':        '/images/categorias/ocio.png',
+  'Conocer gente':        '/images/categorias/conocer.png',
+  'Gastronomía':          '/images/categorias/gastronomia.png',
+  'Cultura':              '/images/categorias/cultura.png',
+  'Aficiones':            '/images/categorias/aficiones.png',
+  'Viajes y escapadas':   '/images/categorias/viajes.png',
+  'Formación':            '/images/categorias/formacion.png',
+  'Familia':              '/images/categorias/familia.png',
+  'Voluntariado':         '/images/categorias/voluntariado.png',
+  'Otros':                '/images/categorias/otros.png',
+};
+
+const FALLBACK_IMAGE = '/images/categorias/otros.png';
+
+/** Returns the image URL to display for an activity.
+ *  Priority: custom imagenUrl → category default → otros.jpg */
+export function getActivityImage(imagenUrl?: string, category?: string): string {
+  if (imagenUrl && imagenUrl.trim() !== '') return imagenUrl;
+  return (category && CATEGORY_DEFAULT_IMAGES[category]) ?? FALLBACK_IMAGE;
+}

@@ -67,6 +67,7 @@ export default defineConfig({
       workbox: {
         // Cache only app shell assets; all API/WS calls go to network
         globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
+        globIgnores: ['images/categorias/**'],
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/api/, /^\/socket\.io/],
         runtimeCaching: [

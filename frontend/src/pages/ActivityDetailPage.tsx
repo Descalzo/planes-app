@@ -29,7 +29,7 @@ import {
   fetchPrivateActivityConversations,
   PrivateActivityConversation,
 } from '../services/privateActivityChatService';
-import { getCategoryVisual } from '../utils/activityImages';
+import { getCategoryVisual, getActivityImage } from '../utils/activityImages';
 
 function getErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
@@ -58,6 +58,7 @@ export default function ActivityDetailPage() {
   const [requestActionId, setRequestActionId] = useState<string | null>(null);
   const [privateConversations, setPrivateConversations] = useState<PrivateActivityConversation[]>([]);
   const [isSaved, setIsSaved] = useState(false);
+  const [detailImgError, setDetailImgError] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -335,12 +336,13 @@ export default function ActivityDetailPage() {
           <div className="detail-card">
             {(() => {
               const visual = getCategoryVisual(activity.categoria);
-              return activity.imagenUrl ? (
+              const imageUrl = getActivityImage(activity.imagenUrl, activity.categoria);
+              return !detailImgError ? (
                 <img
                   className="detail-card__image"
-                  src={activity.imagenUrl}
+                  src={imageUrl}
                   alt={activity.titulo}
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                  onError={() => setDetailImgError(true)}
                 />
               ) : (
                 <div

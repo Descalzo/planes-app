@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getCategoryVisual } from '../utils/activityImages';
+import { getCategoryVisual, getActivityImage } from '../utils/activityImages';
 
 function HeartIcon({ filled }: { filled: boolean }) {
   return (
@@ -77,18 +78,18 @@ export default function ActivityCard({
       : 'activity-card';
 
   const visual = getCategoryVisual(category);
+  const [imgError, setImgError] = useState(false);
+  const imageUrl = getActivityImage(imagenUrl, category);
 
   return (
     <article className={cardClassName}>
       <div className="activity-card__media">
-        {imagenUrl ? (
+        {!imgError ? (
           <img
             className="activity-card__image"
-            src={imagenUrl}
+            src={imageUrl}
             alt={title}
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = 'none';
-            }}
+            onError={() => setImgError(true)}
           />
         ) : (
           <div
