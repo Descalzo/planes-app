@@ -1,330 +1,68 @@
 # Continuidad del proyecto Planes
 
-Documento de estado real del proyecto para que cualquier agente o desarrollador pueda continuar sin contexto previo.
+Documento de estado real del proyecto. Última actualización: tag **v0.4-social-profiles**.
 
-## Estado actual del proyecto
+---
 
-### Objetivo de la aplicacion
+## Objetivo de la aplicación
 
-Planes es una app social/local para encontrar planes y actividades con otras personas. El usuario puede registrarse, iniciar sesion, crear actividades, unirse, salir, chatear dentro de una actividad y gestionar participantes si es el creador.
+Planes es una app social/local para encontrar y organizar actividades con otras personas. Los usuarios pueden registrarse, crear actividades, unirse a ellas, chatear con el resto de participantes, ver perfiles públicos y gestionar su propia actividad como organizador.
 
-### Arquitectura general
+---
+
+## Arquitectura general
+
+```
+móvil / navegador
+      │
+      ▼
+Frontend React (Vite) — puerto 4173
+      │  Vite proxy en dev: /users y /activities → localhost:3000
+      ▼
+Backend NestJS — puerto 3000
+      │
+      ▼
+MongoDB (Mongoose)
+```
 
 - Backend NestJS en `http://localhost:3000`.
-- Frontend React + Vite consumiendo la API con Axios.
+- Frontend React + Vite consumiendo la API con Axios, usando URLs relativas (`/users`, `/activities`).
+- El proxy de Vite reenvía esas rutas al backend. En producción se necesita un reverse proxy (nginx, etc.) o configurar `VITE_API_URL`.
 - Persistencia en MongoDB con Mongoose.
-- Autenticacion JWT con header `Authorization: Bearer TOKEN`.
-- Notificaciones y refresco de estado en frontend con polling y `localStorage`, no con WebSockets.
+- Autenticación JWT con header `Authorization: Bearer TOKEN`.
+- Notificaciones y refresco de estado en frontend con polling y `localStorage`, sin WebSockets.
 
-### Tecnologias utilizadas
+---
 
-- Backend: NestJS 11, TypeScript, Mongoose, MongoDB, Passport JWT, bcrypt, class-validator, Swagger.
-- Frontend: React 18, Vite, TypeScript, React Router DOM 6, Axios, CSS normal.
-- Runtime: Node.js, npm.
+## Acceso desde red local (móvil, tablet)
 
-### Estructura actual
+El servidor Vite escucha en todas las interfaces (`host: true` en `vite.config.ts`). Al arrancar muestra las URLs disponibles:
 
-```text
-planes/
-  backend/
-    src/
-      activities/
-      auth/
-      common/pipes/
-      database/
-      messages/
-      users/
-      app.module.ts
-      main.ts
-    package.json
-    .env
-  frontend/
-    src/
-      components/
-      pages/
-      routes/
-      services/
-      App.tsx
-      App.css
-      main.tsx
-      index.css
-    package.json
-  docs/
-    CONTINUIDAD_PROYECTO.md
-  README.md
+```
+➜  Local:    http://localhost:4173/
+➜  Network:  http://192.168.1.X:4173/
 ```
 
-## Backend
+El móvil accede a la URL de Network. Las llamadas a la API van a `192.168.1.X:4173/users` etc., que Vite proxea desde el PC a `localhost:3000`. El móvil nunca necesita acceder directamente al puerto 3000.
 
-### Modulos implementados
+El CORS del backend acepta por defecto:
+- `localhost` y `127.0.0.1` en cualquier puerto.
+- Rangos `192.168.x.x` y `10.x.x.x` en cualquier puerto (redes locales comunes).
+- Se puede sobreescribir con la variable `FRONTEND_URL` en el `.env` del backend.
 
-- `UsersModule`: registro, login, usuario actual y busqueda por ID.
-- `AuthModule`: JWT, estrategia Passport, guard y decorador `CurrentUser`.
-- `ActivitiesModule`: actividades, union, salida, expulsiones, desbaneo, silencio de chat.
-- `MessagesModule`: mensajes por actividad.
-- `DatabaseModule`: modulo de conexion.
+---
 
-### Schemas
+## Tecnologías
 
-#### User
+| Capa | Stack |
+|------|-------|
+| Backend | NestJS 11, TypeScript, Mongoose 8, MongoDB, Passport JWT, bcrypt, class-validator, Swagger |
+| Frontend | React 18, Vite, TypeScript, React Router DOM 6, Axios, CSS nativo |
+| Runtime | Node.js 20+, npm |
 
-- `email`: unico, requerido.
-- `nombre`: requerido.
-- `password`: hash bcrypt.
-- `ciudad`: opcional.
-- `bio`: opcional.
-- `intereses`: array opcional.
-- `fotoPerfilUrl`: opcional, URL de foto de perfil.
-- `edad`: opcional.
-- `genero`: opcional.
-- `instagram`: opcional.
-- timestamps.
+---
 
-#### Activity
-
-- `titulo`: requerido.
-- `descripcion`: opcional.
-- `categoria`: opcional, valor libre pero la UI ofrece 11 categorias predefinidas.
-- `ciudad`: opcional.
-- `fecha`: `Date`.
-- `plazas`: numero, default 10.
-- `imagenUrl`: opcional, URL de imagen principal de la actividad.
-- `participantes`: array de `User`.
-- `expulsados`: array de `User`, bloquea reingreso hasta desbaneo.
-- `salidas`: array de `User`, usuarios que se desapuntaron voluntariamente.
-- `chatSilenciados`: array de `User`, no pueden escribir en el chat.
-- `creador`: `User`.
-- timestamps.
-
-#### Message
-
-- `activity`: referencia a `Activity`.
-- `author`: referencia a `User`.
-- `text`: requerido.
-- timestamps.
-
-### DTOs
-
-- `CreateUserDto`: `email`, `nombre`, `contraseña`, `ciudad?`, `bio?`, `intereses?`.
-- `LoginUserDto`: `email`, `contraseña`.
-- `CreateActivityDto`: `titulo`, `descripcion?`, `categoria?`, `ciudad?`, `fecha?`, `plazas?`, `imagenUrl?` (URL validada si viene informada).
-- `UpdateActivityDto`: extiende `CreateActivityDto` con todos los campos opcionales.
-- `CreateMessageDto`: `text`.
-- `JoinActivityDto` existe en el repo historicamente, pero el flujo actual de join no usa body.
-
-Nota: hay archivos con mojibake en la palabra `contraseÃ±a`. El flujo funciona, pero la codificacion del repo sigue siendo una deuda tecnica.
-
-### Endpoints disponibles
-
-#### Usuarios
-
-- `POST /users`
-- `POST /users/login`
-- `GET /users/me`
-- `GET /users/:id`
-
-#### Actividades
-
-- `GET /activities`
-- `POST /activities`
-- `GET /activities/:id`
-- `PATCH /activities/:id` (editar, solo creador)
-- `PATCH /activities/:id/join`
-- `PATCH /activities/:id/leave`
-- `PATCH /activities/:id/participants/:participantId/remove`
-- `PATCH /activities/:id/participants/:participantId/unban`
-- `PATCH /activities/:id/participants/:participantId/mute`
-- `PATCH /activities/:id/participants/:participantId/unmute`
-
-#### Mensajes
-
-- `GET /activities/:activityId/messages`
-- `POST /activities/:activityId/messages`
-
-### Flujo de autenticacion JWT
-
-1. Registro con `POST /users`.
-2. Login con `POST /users/login`.
-3. Backend valida credenciales con bcrypt.
-4. Backend firma JWT con `sub`, `email` y `nombre`.
-5. Frontend guarda el token en `localStorage` con clave `planes_jwt`.
-6. Axios manda `Authorization: Bearer TOKEN` en cada llamada protegida.
-7. `JwtAuthGuard` protege los endpoints sensibles y `CurrentUser` expone el usuario autenticado.
-
-### Variables de entorno necesarias
-
-`backend/.env`:
-
-```env
-MONGODB_URI=mongodb+srv://usuario:password@cluster/db
-JWT_SECRET=un_secreto_largo_y_privado
-PORT=3000
-FRONTEND_URL=http://localhost:5173
-```
-
-Notas:
-- `PORT` es opcional.
-- `FRONTEND_URL` es opcional. Si no existe, CORS permite `localhost` y `127.0.0.1` en puertos locales.
-- No guardar secretos reales en git.
-
-### Pendientes conocidos del backend
-
-- No hay WebSockets.
-- No hay sistema de notificaciones persistente en backend.
-- No hay edicion/borrado de actividades.
-- No hay paginacion ni busqueda avanzada.
-- No hay tests actualizados para los flujos nuevos.
-- `start:prod` sigue apuntando a `dist/main`, pero el build actual genera `dist/src/main`; para arrancar desde build se usa `node dist/src/main`.
-- Existen documentos antiguos en MongoDB con datos inconsistentes; el backend ya tolera varios casos, pero la base sigue sucia.
-
-## Frontend
-
-### Paginas implementadas
-
-- `LoginPage`
-- `RegisterPage`
-- `ActivitiesPage`
-- `MyActivitiesPage`
-- `CreateActivityPage`
-- `ActivityDetailPage`
-- `ActivityChatPage`
-
-### Componentes implementados
-
-- `Navigation`: barra superior, cambia segun exista JWT.
-- `AuthForm`: login/registro.
-- `ActivityForm`: crear actividad.
-- `ActivityCard`: card con estados visuales de unido, expulsado, novedades y mensajes.
-- `MessageList`: lista de mensajes con polling y auto-scroll al final.
-- `MessageInput`: envio de mensajes con errores de permisos.
-
-### Servicios API
-
-- `api.ts`: instancia Axios, base URL, `setAuthToken`, `getAuthToken`, persistencia del JWT.
-- `authService.ts`: registro, login, usuario actual.
-- `activityService.ts`: actividades, join, leave, remove, unban, mute, unmute y helpers de estado.
-- `messageService.ts`: listar y crear mensajes.
-- `notificationService.ts`: marcas locales por usuario+actividad para actividad vista y chat visto.
-
-### Rutas existentes
-
-- `/` -> redirige a `/activities` si hay JWT, o a `/login` si no.
-- `/login`
-- `/register`
-- `/activities`
-- `/my-activities`
-- `/activities/new`
-- `/activities/:activityId`
-- `/activities/:activityId/chat`
-
-Las rutas de app estan protegidas por presencia de JWT en `localStorage`.
-
-### Flujo de navegacion
-
-Sin JWT:
-- Solo se ven `Login` y `Registro`.
-- Rutas protegidas redirigen a `/login`.
-
-Con JWT:
-- Se ven `Actividades`, `Mis actividades`, `Crear actividad` y `Cerrar sesion`.
-- `Cerrar sesion` borra el token y manda a `/login`.
-
-### Estado actual del diseno
-
-- Layout centrado con ancho maximo.
-- Fondo suave y cards modernas.
-- Estados visuales:
-  - unido.
-  - expulsado.
-  - novedades de actividad.
-  - mensajes nuevos.
-- Formularios limpios.
-- Chat con caja de mensajes, input visible, boton enviar y auto-scroll.
-- Responsive basico para movil.
-
-### Problemas conocidos del frontend
-
-- Las notificaciones son por polling, no tiempo real real.
-- Las marcas de visto viven en `localStorage`.
-- Si se cambia de usuario en el mismo navegador, conviene cerrar sesion correctamente.
-- Algunos textos conservan acentos simples o sin acento para evitar problemas de encoding.
-
-## Base de datos
-
-### Colecciones existentes
-
-- `users`
-- `activities`
-- `messages`
-
-### Relaciones entre entidades
-
-- `Activity.creador` -> `User`
-- `Activity.participantes[]` -> `User`
-- `Activity.expulsados[]` -> `User`
-- `Activity.salidas[]` -> `User`
-- `Activity.chatSilenciados[]` -> `User`
-- `Message.activity` -> `Activity`
-- `Message.author` -> `User`
-
-## Imagenes por URL
-
-Las imagenes se gestionan mediante URLs externas. No hay subida de archivos todavia.
-
-- **Foto de perfil** (`fotoPerfilUrl`): campo URL en `ProfilePage`. Preview circular con iniciales como fallback.
-- **Imagen de actividad** (`imagenUrl`): campo URL en crear y editar actividad. Preview en el formulario.
-  - En cards de actividades: imagen en la cabecera. Sin imagen → placeholder de color con emoji segun categoria.
-  - En detalle de actividad: imagen grande al inicio del card.
-  - En perfil publico: foto de perfil o avatar con iniciales si no hay foto.
-- Categorias predefinidas con color y emoji asignado en `frontend/src/utils/activityImages.ts`.
-- Pendiente: subida real de archivos con Cloudinary/S3 u otro proveedor.
-
-## Funcionalidades ya terminadas
-
-- Registro y login reales.
-- JWT en `localStorage`.
-- Header `Authorization` automatico.
-- Rutas protegidas.
-- Listado general de actividades.
-- Pagina `Mis actividades`.
-- Crear actividad.
-- Crear actividad mete al creador como participante.
-- Unirse a actividad.
-- Desapuntarse de una actividad.
-- Expulsar participantes.
-- Desbanear expulsados.
-- Creador ve participantes, expulsados y usuarios que se desapuntaron.
-- Creador puede silenciar y permitir hablar en chat.
-- Backend bloquea mensajes de usuarios silenciados.
-- Chat por actividad.
-- Polling de actividad y mensajes.
-- Avisos visuales de mensajes nuevos y novedades de actividad.
-
-## Funcionalidades parcialmente implementadas
-
-- Avisos: funcionan con polling y `localStorage`, no con notificaciones push.
-- Moderacion: ya hay quitar, desbanear y silenciar, pero no existe historial o razon del moderado.
-- Chat: no hay websockets ni presencia en tiempo real.
-
-## Proximos pasos recomendados
-
-1. Pasar avisos y chat a WebSockets o SSE.
-2. Persistir estado de notificaciones vistas en backend.
-3. Arreglar codificacion UTF-8 en todos los archivos con mojibake.
-4. Arreglar `start:prod` para que use la ruta real de build.
-5. Limpiar datos antiguos incoherentes de MongoDB.
-6. AÃ±adir tests para join/leave/remove/unban/mute/unmute y mensajes.
-7. AÃ±adir busqueda, filtros y paginacion.
-8. AÃ±adir borrado o edicion de actividades si entra en alcance.
-
-## Errores conocidos
-
-- `npm run start:prod` no arranca la build actual tal como esta escrita.
-- El proyecto tiene algunos textos con codificacion mezclada.
-- No hay cobertura automatica suficiente para los flujos nuevos.
-- Las notificaciones dependen de polling y pueden tardar unos segundos.
-
-## Como arrancar el proyecto
+## Cómo arrancar
 
 ### Backend
 
@@ -334,22 +72,13 @@ npm install
 npm run start:dev
 ```
 
-Build:
+Swagger disponible en `http://localhost:3000/api`.
+
+Build de producción:
 
 ```powershell
 npm run build
-```
-
-Arranque desde build actual:
-
-```powershell
-node dist/src/main
-```
-
-Swagger:
-
-```text
-http://localhost:3000/api
+node dist/src/main   # (no node dist/main — el build genera dist/src/)
 ```
 
 ### Frontend
@@ -360,30 +89,550 @@ npm install
 npm run dev
 ```
 
-Opcional `frontend/.env`:
+Para build:
+
+```powershell
+npm run build
+npm run preview
+```
+
+### Variables de entorno
+
+`backend/.env`:
+
+```env
+MONGODB_URI=mongodb+srv://usuario:password@cluster/db
+JWT_SECRET=un_secreto_largo_y_privado
+PORT=3000
+FRONTEND_URL=http://localhost:4173   # opcional; si no se define, acepta localhost y redes locales
+```
+
+`frontend/.env` (opcional, solo si no usas el proxy de Vite):
 
 ```env
 VITE_API_URL=http://localhost:3000
 ```
 
-Build:
+---
 
-```powershell
-npm run build
+## Estructura de directorios
+
+```text
+planes/
+  backend/
+    src/
+      activities/
+        dto/
+          create-activity.dto.ts
+          update-activity.dto.ts
+        schemas/activity.schema.ts
+        activities.controller.ts
+        activities.service.ts
+        activities.module.ts
+      auth/
+        auth.module.ts
+        auth.service.ts
+        current-user.decorator.ts
+        jwt-auth.guard.ts
+        jwt.strategy.ts
+        optional-jwt-auth.guard.ts
+      common/pipes/parse-object-id.pipe.ts
+      database/database.module.ts
+      messages/
+        dto/create-message.dto.ts
+        schemas/message.schema.ts
+        messages.controller.ts
+        messages.service.ts
+        messages.module.ts
+      users/
+        dto/
+          create-user.dto.ts
+          login-user.dto.ts
+          update-user.dto.ts
+        schemas/user.schema.ts
+        users.controller.ts
+        users.service.ts
+        users.module.ts
+      app.module.ts
+      main.ts
+    package.json
+    .env
+  frontend/
+    src/
+      components/
+        ActivityCard.tsx
+        ActivityForm.tsx
+        AuthForm.tsx
+        MessageInput.tsx
+        MessageList.tsx
+        Navigation.tsx
+      pages/
+        ActivitiesPage.tsx
+        ActivityChatPage.tsx
+        ActivityDetailPage.tsx
+        CreateActivityPage.tsx
+        EditActivityPage.tsx
+        LoginPage.tsx
+        MyActivitiesPage.tsx
+        ProfilePage.tsx
+        RegisterPage.tsx
+        UserPublicProfilePage.tsx
+      routes/AppRoutes.tsx
+      services/
+        api.ts
+        activityService.ts
+        authService.ts
+        messageService.ts
+        notificationService.ts
+      utils/activityImages.ts
+      App.tsx
+      App.css
+      index.css
+      main.tsx
+    vite.config.ts
+    package.json
+  docs/
+    CONTINUIDAD_PROYECTO.md
 ```
 
-## Ultimo estado verificado
+---
 
-Ultima verificacion manual de esta sesion:
+## Backend
 
-- `npm run build` en backend: OK.
-- `npm run build` en frontend: OK.
-- Backend levantado en `http://localhost:3000`.
-- `GET /activities` responde `200`.
-- Login funciona.
-- El listado de actividades carga.
-- Crear actividad funciona.
-- Unirse, salir, quitar, desbanear, silenciar y permitir hablar funcionan.
-- El chat carga mensajes y los envia.
-- Los mensajes nuevos y cambios de actividad aparecen por polling.
-- El auto-scroll del chat baja al final cuando llegan mensajes nuevos.
+### Módulos
+
+| Módulo | Responsabilidad |
+|--------|----------------|
+| `UsersModule` | Registro, login, perfil propio, perfil público |
+| `AuthModule` | JWT, estrategia Passport, guard, decorador `CurrentUser` |
+| `ActivitiesModule` | CRUD actividades, unión, salida, moderación de participantes |
+| `MessagesModule` | Mensajes por actividad |
+| `DatabaseModule` | Conexión MongoDB |
+
+### Schemas
+
+#### User
+
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| `email` | String | Único, requerido |
+| `nombre` | String | Requerido |
+| `password` | String | Hash bcrypt, excluido de queries |
+| `ciudad` | String | Opcional |
+| `bio` | String | Opcional |
+| `intereses` | String[] | Opcional, array |
+| `fotoPerfilUrl` | String | Opcional, URL de foto de perfil |
+| `edad` | Number | Opcional |
+| `genero` | String | Opcional |
+| `instagram` | String | Opcional |
+| `telefono` | String | Opcional, `select: false` |
+| timestamps | — | `createdAt`, `updatedAt` automáticos |
+
+#### Activity
+
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| `titulo` | String | Requerido |
+| `descripcion` | String | Opcional |
+| `categoria` | String | Opcional; la UI ofrece 11 categorías predefinidas |
+| `ciudad` | String | Opcional |
+| `fecha` | Date | Opcional |
+| `plazas` | Number | Default 10 |
+| `imagenUrl` | String | Opcional, URL de imagen principal |
+| `participantes` | ObjectId[] | Ref User; incluye al creador al crear |
+| `expulsados` | ObjectId[] | Ref User; bloqueados hasta desbaneo |
+| `salidas` | ObjectId[] | Ref User; se desapuntaron voluntariamente |
+| `chatSilenciados` | ObjectId[] | Ref User; no pueden escribir en el chat |
+| `creador` | ObjectId | Ref User, requerido |
+| timestamps | — | `createdAt`, `updatedAt` automáticos |
+
+#### Message
+
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| `activity` | ObjectId | Ref Activity |
+| `author` | ObjectId | Ref User |
+| `text` | String | Requerido |
+| timestamps | — | `createdAt`, `updatedAt` automáticos |
+
+### DTOs relevantes
+
+- `CreateUserDto`: `email`, `nombre`, `contraseña`, `ciudad?`, `bio?`, `intereses?`.
+- `LoginUserDto`: `email`, `contraseña`.
+- `UpdateProfileDto`: todos los campos de perfil opcionales. `fotoPerfilUrl` validado como URL solo si no está vacío (`@ValidateIf`).
+- `CreateActivityDto`: `titulo`, `descripcion?`, `categoria?`, `ciudad?`, `fecha?`, `plazas?`, `imagenUrl?`. `imagenUrl` validado como URL solo si no está vacío.
+- `UpdateActivityDto`: extiende `PartialType(CreateActivityDto)`, todos opcionales.
+- `CreateMessageDto`: `text`.
+
+> **Nota sobre encoding**: algunos archivos tienen `contraseÃ±a` (mojibake de `contraseña`). El flujo funciona en runtime pero es una deuda técnica.
+
+### Endpoints
+
+#### Usuarios (`/users`)
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| POST | `/users` | No | Registro |
+| POST | `/users/login` | No | Login, devuelve JWT |
+| GET | `/users/me` | JWT | Usuario autenticado |
+| PATCH | `/users/me` | JWT | Actualizar perfil propio |
+| GET | `/users/:id/public` | Opcional JWT | Perfil público (requiere `?activityId=` para ver otro usuario) |
+| GET | `/users/:id` | No | Usuario por ID |
+
+#### Actividades (`/activities`)
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| GET | `/activities` | No | Listar todas |
+| POST | `/activities` | JWT | Crear (creator se añade como participante automáticamente) |
+| GET | `/activities/:id` | No | Detalle |
+| PATCH | `/activities/:id` | JWT | Editar (solo creador) |
+| PATCH | `/activities/:id/join` | JWT | Unirse |
+| PATCH | `/activities/:id/leave` | JWT | Desapuntarse |
+| PATCH | `/activities/:id/participants/:pid/remove` | JWT | Expulsar (solo creador) |
+| PATCH | `/activities/:id/participants/:pid/unban` | JWT | Desbanear (solo creador) |
+| PATCH | `/activities/:id/participants/:pid/mute` | JWT | Silenciar en chat (solo creador) |
+| PATCH | `/activities/:id/participants/:pid/unmute` | JWT | Permitir hablar (solo creador) |
+
+#### Mensajes (`/activities/:activityId/messages`)
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| GET | `/activities/:id/messages` | No | Listar mensajes |
+| POST | `/activities/:id/messages` | JWT | Enviar mensaje (cualquier usuario autenticado, no requiere estar unido) |
+
+### Permisos del chat
+
+- Cualquier usuario autenticado puede escribir en el chat (no es necesario estar unido a la actividad).
+- Los usuarios silenciados (`chatSilenciados`) reciben 403 al intentar escribir.
+- El creador puede silenciar/dessilenciar participantes desde la pantalla de detalle.
+
+### Perfiles públicos
+
+La ruta `GET /users/:id/public` aplica estas reglas:
+- Sin `activityId`: solo el propio usuario puede verse a sí mismo.
+- Con `activityId` válido:
+  - Si el usuario solicitado es **creador** de la actividad → visible para todos.
+  - Si es **participante** → visible para el creador y otros participantes.
+  - En cualquier otro caso → 403.
+- El `activityId` es validado como ObjectId antes de consultar; strings inválidos (`"undefined"`, `"null"`, etc.) se tratan como ausentes.
+
+### Autenticación JWT
+
+1. Registro: `POST /users` → devuelve usuario sin password.
+2. Login: `POST /users/login` → devuelve `{ access_token, user }`.
+3. Frontend guarda el token en `localStorage` con clave `planes_jwt`.
+4. Axios añade `Authorization: Bearer TOKEN` en cada petición protegida.
+5. `JwtAuthGuard` protege los endpoints sensibles.
+6. `OptionalJwtAuthGuard` permite requests sin token pero expone el usuario si viene.
+7. `CurrentUser` decorador extrae `{ id, email, nombre }` del payload JWT.
+
+---
+
+## Frontend
+
+### Diseño y UX
+
+- **Mobile-first**. Sistema de tokens CSS en `:root` (`--primary`, `--surface`, `--bg`, radios, sombras, etc.).
+- **Paleta**: fondo `#f8fafc`, superficies blancas, acento indigo `#6366f1`, gradiente indigo→violeta.
+- **Navegación**: topbar minimal (brand + botón logout) + barra inferior fija con 4 tabs:
+  - **Explorar** (`/activities`)
+  - **Mis planes** (`/my-activities`)
+  - **FAB +** (`/activities/new`) — botón central de creación
+  - **Perfil** (`/profile`)
+  - En la página de chat la barra inferior se oculta para maximizar espacio.
+- **Chat**: burbujas propias a la derecha (gradiente indigo), ajenas a la izquierda (blanco). Layout flex full-height con input pegado al fondo.
+- **Cards de actividad**: imagen/placeholder en la cabecera, badges de estado (`Creada por ti`, `Ya unido`, `Te han quitado`), notificaciones de mensajes nuevos y novedades clicables.
+- Responsive con media queries para pantallas ≤640px. Botones full-width en móvil con excepciones para controles pequeños.
+
+### Páginas
+
+| Página | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `LoginPage` | `/login` | No | Formulario de login |
+| `RegisterPage` | `/register` | No | Formulario de registro |
+| `ActivitiesPage` | `/activities` | Sí | Listado con filtros por categoría |
+| `MyActivitiesPage` | `/my-activities` | Sí | Mis actividades con tabs: Todas / Creadas / Unidas |
+| `CreateActivityPage` | `/activities/new` | Sí | Formulario de creación |
+| `EditActivityPage` | `/activities/:id/edit` | Sí | Formulario de edición (solo creador) |
+| `ActivityDetailPage` | `/activities/:id` | Sí | Detalle, participantes, moderación |
+| `ActivityChatPage` | `/activities/:id/chat` | Sí | Chat de la actividad |
+| `ProfilePage` | `/profile` | Sí | Edición del perfil propio |
+| `UserPublicProfilePage` | `/users/:id/profile` | Sí | Perfil público de otro usuario |
+
+### Componentes
+
+| Componente | Descripción |
+|------------|-------------|
+| `Navigation` | Topbar + barra de navegación inferior. Detecta ruta de chat para ocultarla. |
+| `ActivityCard` | Card con imagen/placeholder por categoría, badges, notificaciones clicables. |
+| `ActivityForm` | Formulario de creación con selector de categoría e imagen. |
+| `AuthForm` | Login/registro. |
+| `MessageList` | Lista de mensajes con burbujas, polling cada 3 s, auto-scroll al fondo. |
+| `MessageInput` | Input de chat con botón icono de envío. |
+
+### Servicios
+
+| Servicio | Descripción |
+|----------|-------------|
+| `api.ts` | Instancia Axios, `baseURL = ''` (proxy Vite), gestión del JWT en localStorage. |
+| `authService.ts` | Registro, login, usuario actual, perfil público. |
+| `activityService.ts` | CRUD actividades, join/leave, remove/unban/mute/unmute, helpers de estado. |
+| `messageService.ts` | Listar y crear mensajes. |
+| `notificationService.ts` | Marcas locales de visto por usuario+actividad en localStorage. |
+
+### Utilidades
+
+| Utilidad | Descripción |
+|----------|-------------|
+| `utils/activityImages.ts` | Mapa categoría → `{ gradient, emoji }` para placeholders. Exporta `CATEGORIES` y `getCategoryVisual()`. |
+
+### Rutas del frontend
+
+```
+/                         → redirige a /activities o /login según JWT
+/login
+/register
+/activities               → listado general + filtros por categoría
+/my-activities            → mis planes (Todas / Creadas / Unidas)
+/activities/new           → crear actividad
+/activities/:id           → detalle
+/activities/:id/edit      → editar (solo creador)
+/activities/:id/chat      → chat
+/profile                  → perfil propio
+/users/:id/profile        → perfil público
+```
+
+### Categorías predefinidas
+
+Las categorías se definen en `frontend/src/utils/activityImages.ts`:
+
+| Categoría | Gradiente | Emoji |
+|-----------|-----------|-------|
+| Deporte y aire libre | verde | 🏃 |
+| Ocio y social | ámbar | 🎉 |
+| Conocer gente | rosa | 👋 |
+| Gastronomía | naranja | 🍽️ |
+| Cultura | indigo | 🎭 |
+| Aficiones | teal | 🎨 |
+| Viajes y escapadas | azul | ✈️ |
+| Formación | amarillo | 📚 |
+| Familia | rosa claro | 👨‍👩‍👧 |
+| Voluntariado | rojo | ❤️ |
+| Otros | gris | ✨ |
+
+### Imágenes por URL
+
+Las imágenes se gestionan mediante URLs externas. No hay subida de archivos.
+
+- **`fotoPerfilUrl`** (User): campo URL en `ProfilePage`. Preview circular con iniciales como fallback. En perfiles públicos: foto o avatar con gradiente indigo + iniciales blancas.
+- **`imagenUrl`** (Activity): campo URL en crear y editar actividad. Preview en formulario. En cards: imagen de cabecera o placeholder de color/emoji por categoría. En detalle: imagen grande a ancho completo.
+- Tanto `fotoPerfilUrl` como `imagenUrl` permiten cadena vacía para borrar la imagen sin error de validación (`@ValidateIf` en el DTO).
+- **Pendiente**: subida real de archivos con Cloudinary, S3 u otro proveedor.
+
+### Filtros y vistas
+
+**ActivitiesPage** — filtro por categoría:
+- Chips horizontales con wrap. Chip "Todas" + uno por cada categoría.
+- Filtrado client-side sobre los datos ya cargados.
+- Contador en el heading actualizado con la selección.
+
+**MyActivitiesPage** — tabs de vista:
+- `Todas`: actividades en las que participa o fue expulsado.
+- `Creadas por mí`: solo donde el usuario es organizador.
+- `A las que me uní`: solo donde participa pero no es organizador.
+
+---
+
+## Base de datos
+
+### Colecciones
+
+- `users`
+- `activities`
+- `messages`
+
+### Relaciones
+
+```
+Activity.creador          → User
+Activity.participantes[]  → User
+Activity.expulsados[]     → User
+Activity.salidas[]        → User
+Activity.chatSilenciados[] → User
+Message.activity          → Activity
+Message.author            → User
+```
+
+---
+
+## Flujos principales
+
+### Registro y login
+
+1. `POST /users` con `{ email, nombre, contraseña }`.
+2. `POST /users/login` → recibe `access_token`.
+3. Frontend guarda token en `localStorage`.
+4. Todas las rutas privadas verifican el token con `ProtectedRoute`.
+
+### Crear actividad
+
+1. El creador rellena el formulario (título, descripción, categoría, ciudad, fecha, plazas, imagenUrl).
+2. `POST /activities` → el backend añade al creador como primer participante.
+3. Redirige al detalle.
+
+### Unirse / salir
+
+- `PATCH /activities/:id/join` → añade al usuario a `participantes`.
+- `PATCH /activities/:id/leave` → mueve al usuario de `participantes` a `salidas`.
+
+### Moderación (solo creador)
+
+- **Expulsar**: mueve a `expulsados`, elimina de `participantes`. Bloquea futuros `join`.
+- **Desbanear**: elimina de `expulsados`. Permite volver a unirse.
+- **Silenciar**: añade a `chatSilenciados`. El backend rechaza sus mensajes con 403.
+- **Dessilenciar**: elimina de `chatSilenciados`.
+
+### Chat
+
+- `GET /activities/:id/messages` → historial (sin auth).
+- `POST /activities/:id/messages` → enviar (requiere JWT; **no** requiere estar unido).
+- Frontend refresca cada 3 s y hace auto-scroll al último mensaje.
+- Burbujas propias a la derecha, ajenas a la izquierda.
+
+### Ver perfil público
+
+- Desde el detalle de una actividad → botón "Ver perfil" en organizador o participantes.
+- Navega a `/users/:id/profile?activityId=:activityId`.
+- Frontend llama a `GET /users/:id/public?activityId=:activityId`.
+- Backend valida permisos: solo visible entre participantes de la misma actividad.
+- Muestra foto de perfil o avatar con iniciales (gradiente indigo).
+
+---
+
+## Polling y notificaciones
+
+- Las actividades se recargan cada 8 s en las páginas de listado.
+- Los mensajes se recargan cada 3 s en el chat.
+- El detalle de actividad se recarga cada 5 s.
+- Las marcas de "visto" se guardan en `localStorage` con clave `planes_seen_<userId>_<activityId>` y `planes_chat_seen_<userId>_<activityId>`.
+- Los badges de "Mensajes nuevos" y "Novedades en tu actividad" son clicables y llevan directamente al chat o al detalle.
+
+---
+
+## Deuda técnica conocida
+
+- `contraseña` tiene mojibake (`contraseÃ±a`) en algunos archivos. Funciona en runtime pero es un riesgo de mantenimiento.
+- `npm run start:prod` no funciona. Usar `node dist/src/main` desde el directorio del backend.
+- No hay tests automáticos actualizados para los flujos nuevos.
+- Las marcas de visto viven en `localStorage`; si se cambia de usuario en el mismo navegador conviene cerrar sesión.
+- Datos legacy en MongoDB de versiones anteriores pueden tener campos inconsistentes; el backend tolera la mayoría de casos.
+
+---
+
+# Roadmap
+
+## v0.5 — Imágenes y localización
+
+- Subida real de imágenes (Cloudinary / S3).
+- Campo de geolocalización en actividades (coordenadas o dirección).
+- Mostrar distancia al usuario en las cards.
+- Filtro por distancia o ciudad en el listado.
+
+## v0.6 — Chat en tiempo real
+
+- Migrar mensajes a WebSockets (Socket.io o similar).
+- Presencia en tiempo real (quién está en el chat).
+- Indicador de "escribiendo...".
+- Eliminación / moderación de mensajes.
+
+## v0.7 — Notificaciones push
+
+- Notificaciones push web (PWA / Service Worker).
+- Persistir estado de notificaciones en backend (no solo `localStorage`).
+- Notificación cuando alguien se une a tu actividad.
+- Notificación de mensaje nuevo cuando no estás en el chat.
+
+## v0.8 — Confianza y verificación
+
+- Verificación de cuenta por email.
+- Sistema de valoraciones entre participantes.
+- Badge de usuario verificado.
+- Historial de actividades pasadas en el perfil.
+- Bloqueo de usuarios.
+
+---
+
+# Último estado verificado
+
+Tag **v0.4-social-profiles**. Verificado manualmente en desktop (localhost) y móvil (red local `192.168.1.x`).
+
+### Autenticación
+
+- [x] Registro de nuevo usuario.
+- [x] Login con email y contraseña.
+- [x] Persistencia del token en `localStorage`.
+- [x] Logout limpia el token y redirige a `/login`.
+- [x] Rutas protegidas redirigen a `/login` sin token.
+
+### Actividades
+
+- [x] Listado de todas las actividades con polling.
+- [x] Filtro por categoría con chips (client-side).
+- [x] Crear actividad con título, descripción, categoría, ciudad, fecha, plazas e imagen.
+- [x] Editar actividad (solo el creador). Todos los campos editables incluyendo imagen.
+- [x] Borrar imagen de actividad (campo vacío no da error de validación).
+- [x] Detalle de actividad con imagen grande o placeholder por categoría.
+- [x] Badge "Creada por ti" para el organizador, "Ya unido" para participantes.
+- [x] Unirse a una actividad.
+- [x] Desapuntarse de una actividad.
+
+### Participantes y moderación
+
+- [x] El creador ve la lista de participantes, expulsados y usuarios que se desapuntaron.
+- [x] Expulsar participante (lo bloquea para volver a unirse).
+- [x] Desbanear participante.
+- [x] Silenciar participante en el chat.
+- [x] Dessilenciar participante.
+- [x] El botón "Ver perfil" no aparece para el propio usuario.
+- [x] El organizador no ve "Ver perfil" sobre sí mismo.
+
+### Chat
+
+- [x] Cargar mensajes históricos.
+- [x] Enviar mensaje desde cualquier usuario autenticado (sin necesidad de estar unido).
+- [x] Usuarios silenciados reciben error 403.
+- [x] Burbujas propias a la derecha (indigo), ajenas a la izquierda (blanco).
+- [x] Auto-scroll al mensaje más reciente.
+- [x] Polling cada 3 s.
+- [x] Badge "Mensajes nuevos" clicable en cards.
+
+### Perfiles
+
+- [x] Editar perfil propio (nombre, ciudad, bio, intereses, foto, edad, género, instagram).
+- [x] Foto de perfil por URL con preview circular.
+- [x] Borrar foto de perfil (campo vacío no da error de validación).
+- [x] Avatar con iniciales como fallback en el perfil propio.
+- [x] Ver perfil público de otro usuario desde el detalle de actividad.
+- [x] Avatar con gradiente indigo + iniciales blancas cuando no hay foto.
+- [x] Permisos: solo visible entre participantes de la misma actividad.
+
+### Mis actividades
+
+- [x] Tab "Todas": actividades en las que participa o fue expulsado.
+- [x] Tab "Creadas por mí": solo actividades donde es organizador.
+- [x] Tab "A las que me uní": participante pero no organizador.
+
+### Diseño y navegación
+
+- [x] Barra inferior con tabs: Explorar, Mis planes, FAB +, Perfil.
+- [x] Topbar minimal con logout.
+- [x] Barra inferior oculta en la pantalla de chat.
+- [x] Cards con imagen de cabecera o placeholder por categoría.
+- [x] Diseño responsive en móvil.
+
+### Red local
+
+- [x] Frontend accesible desde móvil vía `http://192.168.1.X:4173`.
+- [x] Registro y login desde móvil funcionan correctamente (proxy Vite).
+- [x] Todas las funcionalidades disponibles desde móvil.
