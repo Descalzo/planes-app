@@ -1230,6 +1230,70 @@ button:disabled {
   letter-spacing: 0.06em;
 }
 
+.trust-panel {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.trust-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.trust-stats div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  border-radius: var(--r);
+  background: var(--bg);
+  padding: 0.7rem;
+}
+
+.trust-stats strong {
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow-wrap: break-word;
+}
+
+.trust-stats span {
+  color: var(--text-3);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.trust-badges,
+.trust-achievements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.trust-badge,
+.trust-achievements li {
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--text-3);
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 0.3rem 0.7rem;
+}
+
+.trust-badge--active,
+.trust-achievements li {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.trust-achievements {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .photo-viewer {
   position: fixed;
   inset: 0;
@@ -1358,7 +1422,8 @@ button:disabled {
 
   .profile-layout,
   .form-grid,
-  .activity-filters {
+  .activity-filters,
+  .trust-stats {
     grid-template-columns: 1fr;
   }
 

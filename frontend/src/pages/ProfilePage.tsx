@@ -199,15 +199,6 @@ export default function ProfilePage() {
               placeholder="senderismo, cine, fotografia"
             />
           </label>
-          <label>
-            URL de foto opcional
-            <input
-              type="url"
-              value={fotoPerfilUrl}
-              onChange={(event) => setFotoPerfilUrl(event.target.value)}
-              placeholder="https://example.com/foto.jpg"
-            />
-          </label>
           <ImageUploadField
             id="profile-image-upload"
             label="Subir foto"

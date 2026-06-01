@@ -324,7 +324,7 @@ planes/
 | POST | `/users/login` | No | Login, devuelve JWT |
 | GET | `/users/me` | JWT | Usuario autenticado |
 | PATCH | `/users/me` | JWT | Actualizar perfil propio |
-| GET | `/users/:id/public` | Opcional JWT | Perfil público (requiere `?activityId=` para ver otro usuario) |
+| GET | `/users/:id/public` | Opcional JWT | Perfil público con stats de confianza (requiere `?activityId=` para ver otro usuario) |
 | GET | `/users/:id` | No | Usuario por ID |
 
 #### Actividades (`/activities`)
@@ -391,6 +391,8 @@ La ruta `GET /users/:id/public` aplica estas reglas:
   - Si es **participante** → visible para el creador y otros participantes.
   - En cualquier otro caso → 403.
 - El `activityId` es validado como ObjectId antes de consultar; strings inválidos (`"undefined"`, `"null"`, etc.) se tratan como ausentes.
+
+El perfil público incluye `stats` calculadas dinámicamente: `actividadesCreadas`, `actividadesParticipadas`, `miembroDesde`, `perfilCompleto` y `logros`. Los logros no se guardan manualmente: `perfil_completo`, `organizador_activo` (3+ actividades creadas) y `participante_activo` (5+ actividades participadas) se calculan al consultar.
 
 ### Autenticación JWT
 
@@ -752,6 +754,7 @@ PrivateActivityMessage.receiver → User
 - Frontend llama a `GET /users/:id/public?activityId=:activityId`.
 - Backend valida permisos: solo visible entre participantes de la misma actividad.
 - Muestra foto de perfil o avatar con iniciales (gradiente indigo).
+- Muestra sección "Confianza" con actividades creadas, participaciones, antigüedad en la app y badges de perfil completo, organizador activo y participante activo.
 
 ### Notificaciones internas
 
@@ -915,6 +918,7 @@ Base **v0.4-social-profiles** con cambios posteriores de filtros, ordenación, s
 - [x] Ver perfil público de otro usuario desde el detalle de actividad.
 - [x] Avatar con gradiente indigo + iniciales blancas cuando no hay foto.
 - [x] Permisos: solo visible entre participantes de la misma actividad.
+- [x] Sección de confianza en perfil público con stats y logros calculados dinámicamente.
 
 ### Mis actividades
 

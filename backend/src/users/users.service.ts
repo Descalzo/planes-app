@@ -7,6 +7,14 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { LoginUserDto } from './dto/login-user.dto';
 import { UpdateProfileDto } from './dto/update-user.dto';
 
+type PublicProfileStats = {
+  actividadesCreadas: number;
+  actividadesParticipadas: number;
+  miembroDesde?: Date;
+  perfilCompleto: boolean;
+  logros: string[];
+};
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -95,11 +103,62 @@ export class UsersService {
     return this.userModel.findOne({ email });
   }
 
+  private isProfileComplete(user: UserDocument) {
+    const interests = user.intereses ?? [];
+    return Boolean(
+      user.nombre?.trim() &&
+      user.ciudad?.trim() &&
+      user.bio?.trim() &&
+      user.fotoPerfilUrl?.trim() &&
+      user.edad &&
+      user.genero?.trim() &&
+      interests.length > 0,
+    );
+  }
+
+  private async getPublicProfileStats(user: UserDocument): Promise<PublicProfileStats> {
+    const userObjectId = user._id;
+    const [actividadesCreadas, actividadesParticipadas] = await Promise.all([
+      this.activityModel.countDocuments({ creador: userObjectId }).exec(),
+      this.activityModel.countDocuments({ participantes: userObjectId }).exec(),
+    ]);
+    const perfilCompleto = this.isProfileComplete(user);
+    const logros: string[] = [];
+
+    if (perfilCompleto) {
+      logros.push('perfil_completo');
+    }
+
+    if (actividadesCreadas >= 3) {
+      logros.push('organizador_activo');
+    }
+
+    if (actividadesParticipadas >= 5) {
+      logros.push('participante_activo');
+    }
+
+    return {
+      actividadesCreadas,
+      actividadesParticipadas,
+      miembroDesde: user.get('createdAt') as Date | undefined,
+      perfilCompleto,
+      logros,
+    };
+  }
+
+  private async buildPublicProfileResponse(user: UserDocument) {
+    const stats = await this.getPublicProfileStats(user);
+    return {
+      ...user.toObject(),
+      stats,
+    };
+  }
+
   async getPublicProfile(
     userId: string,
     activityId?: string,
     requesterId?: string,
-  ): Promise<Omit<User, 'password' | 'email' | 'telefono'>> {
+  ): Promise<Omit<User, 'password' | 'email' | 'telefono'> & { stats: PublicProfileStats }> {
     const user = await this.userModel.findById(userId).select('-password -email -telefono').exec();
     if (!user) {
       throw new NotFoundException(`Usuario con ID ${userId} no encontrado`);
@@ -113,7 +172,7 @@ export class UsersService {
 
     if (!validActivityId) {
       if (requesterId && requesterId === userId) {
-        return user.toObject();
+        return this.buildPublicProfileResponse(user);
       }
       throw new ForbiddenException('Acceso denegado al perfil público');
     }
@@ -134,7 +193,7 @@ export class UsersService {
 
     // Caso 1: Si el usuario solicitado es creador, cualquiera puede verlo desde la actividad
     if (isCreator) {
-      return user.toObject();
+      return this.buildPublicProfileResponse(user);
     }
 
     // Caso 2: Si el usuario solicitado es participante
@@ -152,14 +211,14 @@ export class UsersService {
 
       // Solo el creador u otros participantes pueden ver a los participantes
       if (requesterIsCreator || requesterIsParticipant) {
-        return user.toObject();
+        return this.buildPublicProfileResponse(user);
       }
 
       throw new ForbiddenException('Acceso denegado al perfil público');
     }
 
     if (isPendingRequest && requestIdObj && activity.creador.toString() === requestIdObj.toString()) {
-      return user.toObject();
+      return this.buildPublicProfileResponse(user);
     }
 
     // Si el usuario no es ni creador ni participante, acceso denegado

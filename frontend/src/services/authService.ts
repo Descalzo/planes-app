@@ -33,6 +33,13 @@ export interface CurrentUser {
   instagram?: string;
   createdAt?: string;
   updatedAt?: string;
+  stats?: {
+    actividadesCreadas: number;
+    actividadesParticipadas: number;
+    miembroDesde?: string;
+    perfilCompleto: boolean;
+    logros: string[];
+  };
 }
 
 export interface UpdateProfileDto {

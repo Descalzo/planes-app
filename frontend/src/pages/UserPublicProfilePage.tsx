@@ -7,6 +7,24 @@ function getInitials(name?: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || 'U';
 }
 
+function formatDate(value?: string) {
+  if (!value) {
+    return 'No disponible';
+  }
+
+  return new Intl.DateTimeFormat('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value));
+}
+
+const TRUST_BADGES: Record<string, string> = {
+  perfil_completo: 'Perfil completo',
+  organizador_activo: 'Organizador activo',
+  participante_activo: 'Participante activo',
+};
+
 export default function UserPublicProfilePage() {
   const navigate = useNavigate();
   const { userId } = useParams();
@@ -75,6 +93,43 @@ export default function UserPublicProfilePage() {
             )}
             <div className="profile-card__info">
               <h2>{profile.nombre}</h2>
+              {profile.stats && (
+                <div className="profile-card__section trust-panel">
+                  <h3>Confianza</h3>
+                  <div className="trust-stats">
+                    <div>
+                      <strong>{profile.stats.actividadesCreadas}</strong>
+                      <span>Actividades creadas</span>
+                    </div>
+                    <div>
+                      <strong>{profile.stats.actividadesParticipadas}</strong>
+                      <span>Participaciones</span>
+                    </div>
+                    <div>
+                      <strong>{formatDate(profile.stats.miembroDesde)}</strong>
+                      <span>Miembro desde</span>
+                    </div>
+                  </div>
+                  <div className="trust-badges" aria-label="Logros">
+                    <span className={profile.stats.perfilCompleto ? 'trust-badge trust-badge--active' : 'trust-badge'}>
+                      Perfil completo
+                    </span>
+                    <span className={profile.stats.logros.includes('organizador_activo') ? 'trust-badge trust-badge--active' : 'trust-badge'}>
+                      Organizador activo
+                    </span>
+                    <span className={profile.stats.logros.includes('participante_activo') ? 'trust-badge trust-badge--active' : 'trust-badge'}>
+                      Participante activo
+                    </span>
+                  </div>
+                  {profile.stats.logros.length > 0 && (
+                    <ul className="trust-achievements">
+                      {profile.stats.logros.map((logro) => (
+                        <li key={logro}>{TRUST_BADGES[logro] ?? logro}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
               {profile.ciudad && <p><span>Ciudad:</span> {profile.ciudad}</p>}
               {profile.edad && <p><span>Edad:</span> {profile.edad}</p>}
               {profile.genero && <p><span>Género:</span> {profile.genero}</p>}
