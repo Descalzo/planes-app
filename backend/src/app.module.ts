@@ -9,6 +9,7 @@ import { ActivitiesModule } from './activities/activities.module';
 import { MessagesModule } from './messages/messages.module';
 import { AuthModule } from './auth/auth.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PrivateActivityMessagesModule } from './private-activity-messages/private-activity-messages.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     MessagesModule,
     AuthModule,
     NotificationsModule,
+    PrivateActivityMessagesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

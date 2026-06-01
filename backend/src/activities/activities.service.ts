@@ -79,6 +79,9 @@ export class ActivitiesService {
 
       return {
         ...plainActivity,
+        plazas: this.getPlazasTotales(activity),
+        plazasOcupadas: this.getPlazasOcupadas(activity),
+        plazasDisponibles: Math.max(this.getPlazasTotales(activity) - this.getPlazasOcupadas(activity), 0),
         creador: creatorId ? usersById.get(creatorId) ?? creatorId : plainActivity.creador,
         participantes: this.hydrateUserReferences(activity.participantes, usersById),
         solicitudesPendientes: this.hydrateUserReferences(activity.solicitudesPendientes, usersById),
@@ -125,6 +128,14 @@ export class ActivitiesService {
     return (references ?? []).filter((reference) => reference.toString() !== userId);
   }
 
+  private getPlazasTotales(activity: ActivityDocument) {
+    return typeof activity.plazas === 'number' && activity.plazas > 0 ? activity.plazas : 10;
+  }
+
+  private getPlazasOcupadas(activity: ActivityDocument) {
+    return new Set((activity.participantes ?? []).map((participant) => participant.toString())).size;
+  }
+
   async create(createActivityDto: CreateActivityDto, creadorId: string): Promise<Activity> {
     const creadorObjectId = new Types.ObjectId(creadorId);
     const newActivity = new this.activityModel({
@@ -150,6 +161,10 @@ export class ActivitiesService {
     }
 
     const { titulo, descripcion, categoria, ciudad, fecha, plazas, imagenUrl } = dto;
+    if (plazas !== undefined && plazas < this.getPlazasOcupadas(activity)) {
+      throw new BadRequestException('No puedes poner menos plazas que participantes aceptados');
+    }
+
     if (titulo !== undefined) activity.titulo = titulo;
     if (descripcion !== undefined) activity.descripcion = descripcion;
     if (categoria !== undefined) activity.categoria = categoria;
@@ -262,7 +277,7 @@ export class ActivitiesService {
       throw new BadRequestException('El usuario ya participa en esta actividad');
     }
 
-    if ((activity.participantes ?? []).length >= activity.plazas) {
+    if (this.getPlazasOcupadas(activity) >= this.getPlazasTotales(activity)) {
       throw new BadRequestException('No hay plazas disponibles en esta actividad');
     }
 
@@ -339,6 +354,16 @@ export class ActivitiesService {
       activity.salidas = [...(activity.salidas ?? []), new Types.ObjectId(usuarioId)];
     }
     await activity.save();
+
+    const leaver = await this.userModel.findById(usuarioId).select('nombre email').lean().exec();
+    await this.notificationsService.create({
+      recipientId: activity.creador.toString(),
+      actorId: usuarioId,
+      activityId: id,
+      type: 'activity_participant_left',
+      message: `${leaver?.nombre ?? leaver?.email ?? 'Un participante'} se ha desapuntado de ${activity.titulo}`,
+    });
+
     return this.findById(id);
   }
 
@@ -369,6 +394,15 @@ export class ActivitiesService {
     }
 
     await activity.save();
+
+    await this.notificationsService.create({
+      recipientId: participantId,
+      actorId: requesterId,
+      activityId: id,
+      type: 'activity_participant_removed',
+      message: `Has sido eliminado de la actividad "${activity.titulo}"`,
+    });
+
     return this.findById(id);
   }
 

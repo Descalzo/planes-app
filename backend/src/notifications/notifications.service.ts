@@ -42,7 +42,39 @@ export class NotificationsService {
     return this.notificationModel.countDocuments({
       recipient: new Types.ObjectId(userId),
       readAt: { $exists: false },
+      type: { $nin: ['private_activity_message', 'general_chat_message'] },
     });
+  }
+
+  async getUnreadMessagesCount(userId: string) {
+    return this.notificationModel.countDocuments({
+      recipient: new Types.ObjectId(userId),
+      readAt: { $exists: false },
+      type: { $in: ['private_activity_message', 'general_chat_message'] },
+    });
+  }
+
+  async markMessagesReadByActivity(activityId: string, userId: string) {
+    await this.notificationModel.updateMany(
+      {
+        recipient: new Types.ObjectId(userId),
+        activity: new Types.ObjectId(activityId),
+        type: { $in: ['private_activity_message', 'general_chat_message'] },
+        readAt: { $exists: false },
+      },
+      { $set: { readAt: new Date() } },
+    );
+  }
+
+  async markAllStatusRead(userId: string) {
+    await this.notificationModel.updateMany(
+      {
+        recipient: new Types.ObjectId(userId),
+        type: { $nin: ['private_activity_message', 'general_chat_message'] },
+        readAt: { $exists: false },
+      },
+      { $set: { readAt: new Date() } },
+    );
   }
 
   async markAsRead(notificationId: string, userId: string) {
@@ -63,4 +95,3 @@ export class NotificationsService {
     return notification;
   }
 }
-

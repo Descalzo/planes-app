@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiParam, ApiTags } from '@nestjs/swagger';
 import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/create-message.dto';
@@ -32,5 +32,16 @@ export class MessagesController {
     @CurrentUser() user: { id: string },
   ) {
     return this.messagesService.findByActivity(activityId, user.id);
+  }
+
+  @Patch('active')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiParam({ name: 'activityId', description: 'ID de la actividad', type: String })
+  markActive(
+    @Param('activityId', ParseObjectIdPipe) activityId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.messagesService.markUserActiveInGeneralChat(activityId, user.id);
   }
 }

@@ -4,7 +4,6 @@ import {
   acceptActivityRequest,
   Activity,
   fetchActivity,
-  getActivityParticipantsCount,
   getReferenceId,
   getReferenceName,
   isActivityCreator,
@@ -22,7 +21,11 @@ import {
   unmuteActivityParticipant,
 } from '../services/activityService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
-import { markActivitySeen } from '../services/notificationService';
+import { markActivitySeen, hasUnseenPrivateConversations } from '../services/notificationService';
+import {
+  fetchPrivateActivityConversations,
+  PrivateActivityConversation,
+} from '../services/privateActivityChatService';
 import { getCategoryVisual } from '../utils/activityImages';
 
 function getErrorMessage(error: unknown) {
@@ -50,6 +53,7 @@ export default function ActivityDetailPage() {
   const [mutingParticipantId, setMutingParticipantId] = useState<string | null>(null);
   const [unbanningParticipantId, setUnbanningParticipantId] = useState<string | null>(null);
   const [requestActionId, setRequestActionId] = useState<string | null>(null);
+  const [privateConversations, setPrivateConversations] = useState<PrivateActivityConversation[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -106,6 +110,39 @@ export default function ActivityDetailPage() {
       window.clearInterval(intervalId);
     };
   }, [activityId]);
+
+  const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
+
+  useEffect(() => {
+    if (!activityId || !activity || !currentUserId || !isActivityCreator(activity, currentUserId)) {
+      setPrivateConversations([]);
+      return;
+    }
+
+    const currentActivityId = activityId;
+    let isMounted = true;
+
+    async function loadPrivateConversations() {
+      try {
+        const conversations = await fetchPrivateActivityConversations(currentActivityId);
+        if (isMounted) {
+          setPrivateConversations(conversations);
+        }
+      } catch {
+        if (isMounted) {
+          setPrivateConversations([]);
+        }
+      }
+    }
+
+    loadPrivateConversations();
+    const intervalId = window.setInterval(loadPrivateConversations, 10000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, [activityId, activity, currentUserId]);
 
   async function handleJoin() {
     if (!activityId) {
@@ -234,9 +271,10 @@ export default function ActivityDetailPage() {
     }
   }
 
-  const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
-  const participants = activity ? getActivityParticipantsCount(activity, currentUserId) : 0;
-  const availableSpots = typeof activity?.plazas === 'number' ? Math.max(activity.plazas - participants, 0) : null;
+  const acceptedParticipants = activity?.plazasOcupadas ?? (activity?.participantes?.length ?? 0);
+  const totalSpots = activity?.plazas ?? 10;
+  const availableSpots = activity?.plazasDisponibles ?? Math.max(totalSpots - acceptedParticipants, 0);
+  const isFull = availableSpots <= 0;
   const isJoined = Boolean(activity && currentUserId && isUserInActivity(activity, currentUserId));
   const isCreator = Boolean(activity && currentUserId && isActivityCreator(activity, currentUserId));
   const isPending = Boolean(activity && currentUserId && isUserPendingInActivity(activity, currentUserId));
@@ -287,8 +325,9 @@ export default function ActivityDetailPage() {
               <p><span>Categoria</span>{activity.categoria || 'Sin categoria'}</p>
               <p><span>Ciudad</span>{activity.ciudad || 'Sin ciudad'}</p>
               {activity.fecha && <p><span>Fecha</span>{new Date(activity.fecha).toLocaleString()}</p>}
-              <p><span>Participantes</span>{participants}</p>
-              <p><span>Plazas</span>{availableSpots === null ? 'No indicadas' : availableSpots}</p>
+              <p><span>Participantes aceptados</span>{acceptedParticipants}</p>
+              <p><span>Plazas totales</span>{totalSpots}</p>
+              <p><span>Plazas disponibles</span>{isFull ? 'Completa' : availableSpots}</p>
             </div>
             <div className="creator-info">
               <h3>Organizador</h3>
@@ -335,10 +374,10 @@ export default function ActivityDetailPage() {
                             <button
                               className="button button--secondary button--small"
                               type="button"
-                              disabled={requestActionId === userId}
+                              disabled={requestActionId === userId || isFull}
                               onClick={() => handleAcceptRequest(userId)}
                             >
-                              {requestActionId === userId ? 'Guardando...' : 'Aceptar'}
+                              {requestActionId === userId ? 'Guardando...' : isFull ? 'Completa' : 'Aceptar'}
                             </button>
                             <button
                               className="button button--ghost button--small"
@@ -532,19 +571,27 @@ export default function ActivityDetailPage() {
               ) : isPending ? (
                 <>
                   <p className="status-pill">Solicitud pendiente de aprobacion</p>
-                  <button className="button button--ghost" type="button" disabled>
-                    Preguntar al organizador
-                  </button>
+                  {currentUserId && activityId && (
+                    <Link className="button button--ghost" to={`/activities/${activityId}/private-chat/${currentUserId}`}>
+                      Preguntar al organizador
+                    </Link>
+                  )}
                 </>
               ) : isRejected ? (
                 <>
                   <p className="status-pill status-pill--danger">Solicitud rechazada</p>
-                  <button className="button button--primary" type="button" onClick={handleJoin} disabled={isJoining}>
-                    {isJoining ? 'Solicitando...' : 'Solicitar de nuevo'}
-                  </button>
-                  <button className="button button--ghost" type="button" disabled>
+                  {isFull ? (
+                    <p className="status-pill status-pill--danger">Actividad completa</p>
+                  ) : (
+                    <button className="button button--primary" type="button" onClick={handleJoin} disabled={isJoining}>
+                      {isJoining ? 'Solicitando...' : 'Solicitar de nuevo'}
+                    </button>
+                  )}
+                  {currentUserId && activityId && (
+                    <Link className="button button--ghost" to={`/activities/${activityId}/private-chat/${currentUserId}`}>
                     Preguntar al organizador
-                  </button>
+                    </Link>
+                  )}
                 </>
               ) : isJoined ? (
                 <>
@@ -554,15 +601,47 @@ export default function ActivityDetailPage() {
                       {isLeaving ? 'Saliendo...' : 'Desapuntarme'}
                     </button>
                   )}
+                  {!isCreator && currentUserId && activityId && (
+                    <Link className="button button--ghost" to={`/activities/${activityId}/private-chat/${currentUserId}`}>
+                      Preguntar al organizador
+                    </Link>
+                  )}
+                </>
+              ) : isFull ? (
+                <>
+                  <p className="status-pill status-pill--danger">Actividad completa</p>
+                  {currentUserId && activityId && (
+                    <Link className="button button--ghost" to={`/activities/${activityId}/private-chat/${currentUserId}`}>
+                      Preguntar al organizador
+                    </Link>
+                  )}
                 </>
               ) : (
-                <button className="button button--primary" type="button" onClick={handleJoin} disabled={isJoining}>
-                  {isJoining ? 'Solicitando...' : 'Solicitar plaza'}
-                </button>
+                <>
+                  <button className="button button--primary" type="button" onClick={handleJoin} disabled={isJoining}>
+                    {isJoining ? 'Solicitando...' : 'Solicitar plaza'}
+                  </button>
+                  {currentUserId && activityId && (
+                    <Link className="button button--ghost" to={`/activities/${activityId}/private-chat/${currentUserId}`}>
+                      Preguntar al organizador
+                    </Link>
+                  )}
+                </>
               )}
               {isCreator && activityId && (
                 <Link className="button button--ghost" to={`/activities/${activityId}/edit`}>
                   Editar
+                </Link>
+              )}
+              {isCreator && activityId && (
+                <Link
+                  className={`button button--ghost${hasUnseenPrivateConversations(privateConversations, currentUserId, activityId) ? ' button--has-badge' : ''}`}
+                  to={`/activities/${activityId}/conversations`}
+                >
+                  {hasUnseenPrivateConversations(privateConversations, currentUserId, activityId) && (
+                    <span className="button-badge" aria-label="Mensajes nuevos">●</span>
+                  )}
+                  Consultas privadas{privateConversations.length > 0 ? ` (${privateConversations.length})` : ''}
                 </Link>
               )}
               {activityId && (isCreator || isJoined) && (

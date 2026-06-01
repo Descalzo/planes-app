@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fetchActivity, updateActivity } from '../services/activityService';
+import { Activity, fetchActivity, updateActivity } from '../services/activityService';
 import { CATEGORIES } from '../utils/activityImages';
 
 function getErrorMessage(error: unknown) {
@@ -31,6 +31,7 @@ export default function EditActivityPage() {
   const [city, setCity] = useState('');
   const [date, setDate] = useState('');
   const [spots, setSpots] = useState('');
+  const [acceptedParticipants, setAcceptedParticipants] = useState(0);
   const [imagenUrl, setImagenUrl] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,13 +40,14 @@ export default function EditActivityPage() {
   useEffect(() => {
     if (!activityId) return;
     fetchActivity(activityId)
-      .then((activity) => {
+      .then((activity: Activity) => {
         setTitle(activity.titulo ?? '');
         setDescription(activity.descripcion ?? '');
         setCategory(activity.categoria ?? '');
         setCity(activity.ciudad ?? '');
         setDate(toLocalDatetime(activity.fecha));
         setSpots(activity.plazas ? String(activity.plazas) : '');
+        setAcceptedParticipants(activity.plazasOcupadas ?? activity.participantes?.length ?? 0);
         setImagenUrl(activity.imagenUrl ?? '');
       })
       .catch(() => setError('No se pudo cargar la actividad'))
@@ -56,6 +58,11 @@ export default function EditActivityPage() {
     event.preventDefault();
     if (!activityId) return;
     setError(null);
+    if (spots && Number(spots) < acceptedParticipants) {
+      setError(`No puedes poner menos de ${acceptedParticipants} plazas porque ya hay ${acceptedParticipants} participantes aceptados`);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await updateActivity(activityId, {
@@ -110,7 +117,15 @@ export default function EditActivityPage() {
         </label>
         <label>
           Plazas
-          <input min="1" type="number" value={spots} onChange={(e) => setSpots(e.target.value)} />
+          <input
+            min={Math.max(1, acceptedParticipants)}
+            type="number"
+            value={spots}
+            onChange={(e) => setSpots(e.target.value)}
+          />
+          {acceptedParticipants > 0 && (
+            <span className="field-hint">Minimo {acceptedParticipants}: participantes aceptados actuales.</span>
+          )}
         </label>
         <label>
           Imagen (URL)

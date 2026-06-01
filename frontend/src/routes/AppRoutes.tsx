@@ -10,6 +10,9 @@ import ProfilePage from '../pages/ProfilePage';
 import UserPublicProfilePage from '../pages/UserPublicProfilePage';
 import EditActivityPage from '../pages/EditActivityPage';
 import NotificationsPage from '../pages/NotificationsPage';
+import MessagesPage from '../pages/MessagesPage';
+import PrivateActivityChatPage from '../pages/PrivateActivityChatPage';
+import PrivateConversationsPage from '../pages/PrivateConversationsPage';
 import { getAuthToken } from '../services/api';
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
@@ -59,6 +62,14 @@ export function AppRoutes() {
         }
       />
       <Route
+        path="/messages"
+        element={
+          <ProtectedRoute>
+            <MessagesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/activities/new"
         element={
           <ProtectedRoute>
@@ -87,6 +98,22 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <ActivityChatPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activities/:activityId/conversations"
+        element={
+          <ProtectedRoute>
+            <PrivateConversationsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activities/:activityId/private-chat/:userId"
+        element={
+          <ProtectedRoute>
+            <PrivateActivityChatPage />
           </ProtectedRoute>
         }
       />

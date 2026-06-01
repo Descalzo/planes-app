@@ -8,6 +8,8 @@ interface ActivityCardProps {
   city?: string;
   date?: string;
   spots?: number;
+  occupiedSpots?: number;
+  availableSpots?: number;
   participants?: number;
   imagenUrl?: string;
   isJoined?: boolean;
@@ -25,6 +27,8 @@ export default function ActivityCard({
   city,
   date,
   spots,
+  occupiedSpots,
+  availableSpots,
   participants = 0,
   imagenUrl,
   isJoined = false,
@@ -34,7 +38,10 @@ export default function ActivityCard({
   hasUnreadMessages = false,
   leftUsersCount = 0,
 }: ActivityCardProps) {
-  const availableSpots = typeof spots === 'number' ? Math.max(spots - participants, 0) : null;
+  const totalSpots = typeof spots === 'number' ? spots : 10;
+  const usedSpots = typeof occupiedSpots === 'number' ? occupiedSpots : participants;
+  const freeSpots = typeof availableSpots === 'number' ? availableSpots : Math.max(totalSpots - usedSpots, 0);
+  const isFull = freeSpots <= 0;
   const formattedDate = date
     ? new Intl.DateTimeFormat('es-ES', {
         dateStyle: 'medium',
@@ -89,9 +96,10 @@ export default function ActivityCard({
         <h2>{title}</h2>
         <p className="activity-card__date">{formattedDate}</p>
         <p className="activity-card__spots">
-          {availableSpots === null
-            ? `${participants} participantes`
-            : `${participants} participantes · ${availableSpots} plazas disponibles`}
+          {usedSpots}/{totalSpots} plazas ·{' '}
+          <span className={isFull ? 'activity-card__spots-status activity-card__spots-status--full' : 'activity-card__spots-status activity-card__spots-status--available'}>
+            {isFull ? 'Completa' : `Quedan ${freeSpots} plazas`}
+          </span>
         </p>
       </div>
       <div className="activity-card__footer">

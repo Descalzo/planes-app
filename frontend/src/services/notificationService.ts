@@ -1,8 +1,10 @@
 import { Activity } from './activityService';
 import { Message } from './messageService';
+import { PrivateActivityConversation } from './privateActivityChatService';
 
 const ACTIVITY_SEEN_PREFIX = 'planes_activity_seen_';
 const CHAT_SEEN_PREFIX = 'planes_chat_seen_';
+const PRIVATE_CHAT_SEEN_PREFIX = 'planes_private_seen_';
 
 function getScopedKey(prefix: string, activityId: string, userId?: string | null) {
   return `${prefix}${userId ?? 'anonymous'}_${activityId}`;
@@ -39,5 +41,30 @@ export function hasUnreadMessages(activityId: string, messages: Message[], curre
     const authorId = typeof author === 'object' ? author._id ?? author.id : author;
 
     return messageTime > lastSeen && authorId !== currentUserId;
+  });
+}
+
+function getPrivateChatSeenKey(activityId: string, otherUserId: string, currentUserId?: string | null) {
+  return `${PRIVATE_CHAT_SEEN_PREFIX}${currentUserId ?? 'anon'}_${activityId}_${otherUserId}`;
+}
+
+export function markPrivateChatSeen(activityId: string, otherUserId: string, currentUserId?: string | null) {
+  localStorage.setItem(getPrivateChatSeenKey(activityId, otherUserId, currentUserId), String(Date.now()));
+}
+
+export function hasUnseenPrivateConversations(
+  conversations: PrivateActivityConversation[],
+  currentUserId?: string | null,
+  activityId?: string,
+): boolean {
+  if (!activityId) return false;
+  return conversations.some((conv) => {
+    const sender = conv.lastMessage.sender;
+    const senderId = typeof sender === 'object' ? (sender as any)._id ?? (sender as any).id : sender;
+    if (senderId === currentUserId) return false; // yo envié el último → no hay pendiente
+    const otherUserId = senderId as string;
+    const msgTime = getTime((conv.lastMessage as any).createdAt ?? (conv.lastMessage as any).updatedAt);
+    const lastSeen = getStoredTime(getPrivateChatSeenKey(activityId, otherUserId, currentUserId));
+    return msgTime > lastSeen;
   });
 }

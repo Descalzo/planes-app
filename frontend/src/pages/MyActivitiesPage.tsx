@@ -180,6 +180,8 @@ export default function MyActivitiesPage() {
                 city={activity.ciudad}
                 date={activity.fecha}
                 spots={activity.plazas}
+                occupiedSpots={activity.plazasOcupadas}
+                availableSpots={activity.plazasDisponibles}
                 imagenUrl={activity.imagenUrl}
                 participants={getActivityParticipantsCount(activity, currentUserId)}
                 isJoined={Boolean(currentUserId && isUserInActivity(activity, currentUserId))}

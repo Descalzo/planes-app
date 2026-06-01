@@ -1,12 +1,12 @@
 # Continuidad del proyecto Planes
 
-Documento de estado real del proyecto. Última actualización: base **v0.4-social-profiles** + filtros, ordenación, solicitudes de participación y notificaciones internas.
+Documento de estado real del proyecto. Última actualización: base **v0.4-social-profiles** + filtros, ordenación, solicitudes, notificaciones internas y chat privado con organizador.
 
 ---
 
 ## Objetivo de la aplicación
 
-Planes es una app social/local para encontrar y organizar actividades con otras personas. Los usuarios pueden registrarse, crear actividades, solicitar plaza, recibir avisos internos, chatear cuando el organizador acepta la solicitud, ver perfiles públicos y gestionar su propia actividad como organizador.
+Planes es una app social/local para encontrar y organizar actividades con otras personas. Los usuarios pueden registrarse, crear actividades, solicitar plaza, preguntar al organizador por chat privado, recibir avisos internos, chatear en el chat general cuando el organizador acepta la solicitud, ver perfiles públicos y gestionar su propia actividad como organizador.
 
 ---
 
@@ -149,6 +149,12 @@ planes/
         notifications.controller.ts
         notifications.service.ts
         notifications.module.ts
+      private-activity-messages/
+        dto/create-private-activity-message.dto.ts
+        schemas/private-activity-message.schema.ts
+        private-activity-messages.controller.ts
+        private-activity-messages.service.ts
+        private-activity-messages.module.ts
       users/
         dto/
           create-user.dto.ts
@@ -181,6 +187,7 @@ planes/
         MyActivitiesPage.tsx
         NotificationsPage.tsx
         ProfilePage.tsx
+        PrivateActivityChatPage.tsx
         RegisterPage.tsx
         UserPublicProfilePage.tsx
       routes/AppRoutes.tsx
@@ -191,6 +198,7 @@ planes/
         messageService.ts
         notificationService.ts
         internalNotificationService.ts
+        privateActivityChatService.ts
       utils/activityImages.ts
       App.tsx
       App.css
@@ -215,6 +223,7 @@ planes/
 | `ActivitiesModule` | CRUD actividades, unión, salida, moderación de participantes |
 | `MessagesModule` | Mensajes por actividad |
 | `NotificationsModule` | Notificaciones internas persistidas |
+| `PrivateActivityMessagesModule` | Chat privado entre usuario interesado y organizador |
 | `DatabaseModule` | Conexión MongoDB |
 
 ### Schemas
@@ -246,6 +255,8 @@ planes/
 | `ciudad` | String | Opcional |
 | `fecha` | Date | Opcional |
 | `plazas` | Number | Default 10 |
+| `plazasOcupadas` | Number | Campo calculado en respuestas; participantes aceptados |
+| `plazasDisponibles` | Number | Campo calculado en respuestas; `plazas - plazasOcupadas` |
 | `imagenUrl` | String | Opcional, URL de imagen principal |
 | `participantes` | ObjectId[] | Ref User; usuarios aceptados, incluye al creador al crear |
 | `solicitudesPendientes` | ObjectId[] | Ref User; usuarios que han solicitado plaza |
@@ -272,9 +283,19 @@ planes/
 | `recipient` | ObjectId | Ref User; destinatario |
 | `actor` | ObjectId | Ref User; usuario que origina el aviso |
 | `activity` | ObjectId | Ref Activity; actividad relacionada |
-| `type` | String | `activity_request_created`, `activity_request_accepted`, `activity_request_rejected` |
+| `type` | String | `activity_request_created`, `activity_request_accepted`, `activity_request_rejected`, `private_activity_message` |
 | `message` | String | Texto ya preparado para mostrar |
 | `readAt` | Date | Ausente si está sin leer |
+| timestamps | — | `createdAt`, `updatedAt` automáticos |
+
+#### PrivateActivityMessage
+
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| `activity` | ObjectId | Ref Activity |
+| `sender` | ObjectId | Ref User |
+| `receiver` | ObjectId | Ref User |
+| `text` | String | Requerido |
 | timestamps | — | `createdAt`, `updatedAt` automáticos |
 
 ### DTOs relevantes
@@ -341,6 +362,14 @@ Por defecto devuelve actividades próximas (`fecha >= ahora`) y actividades sin 
 | GET | `/notifications/unread-count` | JWT | Contador de notificaciones sin leer |
 | PATCH | `/notifications/:id/read` | JWT | Marcar una notificación propia como leída |
 
+#### Chat privado con organizador (`/activities/:activityId/private-chat`)
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| GET | `/activities/:id/private-chat` | JWT | Listar conversaciones privadas de la actividad (solo creador) |
+| GET | `/activities/:id/private-chat/:userId` | JWT | Ver conversación privada entre creador y usuario |
+| POST | `/activities/:id/private-chat` | JWT | Enviar mensaje privado; usuario normal escribe al creador, creador responde indicando `receiverId` |
+
 ### Permisos del chat
 
 - Solo el creador y los participantes aceptados pueden leer y escribir en el chat general.
@@ -400,6 +429,7 @@ La ruta `GET /users/:id/public` aplica estas reglas:
 | `ActivityChatPage` | `/activities/:id/chat` | Sí | Chat de la actividad |
 | `NotificationsPage` | `/notifications` | Sí | Listado de notificaciones internas pendientes |
 | `ProfilePage` | `/profile` | Sí | Edición del perfil propio |
+| `PrivateActivityChatPage` | `/activities/:id/private-chat/:userId` | Sí | Chat privado con el organizador |
 | `UserPublicProfilePage` | `/users/:id/profile` | Sí | Perfil público de otro usuario |
 
 ### Componentes
@@ -423,6 +453,7 @@ La ruta `GET /users/:id/public` aplica estas reglas:
 | `messageService.ts` | Listar y crear mensajes. |
 | `notificationService.ts` | Marcas locales de visto por usuario+actividad en localStorage. |
 | `internalNotificationService.ts` | Listar notificaciones persistidas, contador sin leer y marcar como leída. |
+| `privateActivityChatService.ts` | Listar consultas privadas, leer conversación y enviar mensajes privados. |
 
 ### Utilidades
 
@@ -442,6 +473,7 @@ La ruta `GET /users/:id/public` aplica estas reglas:
 /activities/:id           → detalle
 /activities/:id/edit      → editar (solo creador)
 /activities/:id/chat      → chat
+/activities/:id/private-chat/:userId → chat privado con organizador
 /notifications            → notificaciones internas
 /profile                  → perfil propio
 /users/:id/profile        → perfil público
@@ -499,6 +531,7 @@ Las imágenes se gestionan mediante URLs externas. No hay subida de archivos.
 - `activities`
 - `messages`
 - `notifications`
+- `privateactivitymessages`
 
 ### Relaciones
 
@@ -515,6 +548,9 @@ Message.author            → User
 Notification.recipient    → User
 Notification.actor        → User
 Notification.activity     → Activity
+PrivateActivityMessage.activity → Activity
+PrivateActivityMessage.sender   → User
+PrivateActivityMessage.receiver → User
 ```
 
 ---
@@ -541,9 +577,21 @@ Notification.activity     → Activity
 - Si el usuario ya participa o ya está pendiente, el backend devuelve error claro.
 - Si estaba en `solicitudesRechazadas`, se elimina de rechazadas y vuelve a quedar pendiente.
 - El creador acepta con `PATCH /activities/:id/requests/:userId/accept`, que mueve al usuario a `participantes`.
+- Al aceptar se comprueba `participantes.length < plazas`; si está completa, se rechaza con error y no se notifica aceptación.
 - El creador rechaza con `PATCH /activities/:id/requests/:userId/reject`, que mueve al usuario a `solicitudesRechazadas`.
 - Aceptar o rechazar crea una notificación interna para el solicitante.
 - `PATCH /activities/:id/leave` → mueve al usuario de `participantes` a `salidas`.
+
+### Plazas y aforo
+
+- `plazas` es el máximo de participantes aceptados.
+- Si `plazas` falta en datos legacy, se trata como 10.
+- Las respuestas de actividades incluyen `plazasOcupadas` y `plazasDisponibles`.
+- El backend impide aceptar solicitudes si no quedan plazas.
+- El backend impide editar una actividad a menos plazas que participantes aceptados actuales.
+- Las cards muestran `X/Y plazas`, `Quedan N plazas` o `Completa`.
+- El detalle muestra participantes aceptados, plazas totales y plazas disponibles.
+- Si la actividad está completa, el frontend muestra `Actividad completa` y no permite solicitar plaza.
 
 ### Moderación (solo creador)
 
@@ -558,6 +606,17 @@ Notification.activity     → Activity
 - `POST /activities/:id/messages` → enviar, requiere JWT y ser creador o participante aceptado.
 - Frontend refresca cada 3 s y hace auto-scroll al último mensaje.
 - Burbujas propias a la derecha, ajenas a la izquierda.
+
+### Chat privado con el organizador
+
+- Cualquier usuario autenticado puede abrir "Preguntar al organizador" desde el detalle.
+- La conversación queda ligada a una actividad concreta y a dos usuarios: interesado y creador.
+- No da acceso al chat general ni cambia el estado de participación.
+- Si el usuario es aceptado después, el historial privado se conserva.
+- Solo el creador y ese usuario pueden leer la conversación.
+- El creador ve un panel "Consultas al organizador" en el detalle de sus actividades.
+- Al recibir un mensaje privado se crea una notificación interna técnica `private_activity_message` solo si el destinatario no está dentro de esa conversación.
+- Las notificaciones de mensajes privados no se muestran en `/notifications` ni cuentan en la campana.
 
 ### Ver perfil público
 
@@ -577,7 +636,8 @@ Notification.activity     → Activity
 - Casos cubiertos:
   - solicitud nueva al creador;
   - solicitud aceptada al solicitante;
-  - solicitud rechazada al solicitante.
+  - solicitud rechazada al solicitante;
+  - mensaje privado recibido sobre una actividad, solo como aviso interno no listado.
 - No hay WebSockets ni push reales; el frontend refresca el contador con polling.
 
 ---
@@ -615,7 +675,6 @@ Notification.activity     → Activity
 
 ## v0.6 — Chat en tiempo real
 
-- Consulta al organizador antes de solicitar/ser aceptado (chat privado o canal de preguntas).
 - Migrar mensajes a WebSockets (Socket.io o similar).
 - Presencia en tiempo real (quién está en el chat).
 - Indicador de "escribiendo...".
@@ -640,7 +699,7 @@ Notification.activity     → Activity
 
 # Último estado verificado
 
-Base **v0.4-social-profiles** con cambios posteriores de filtros, ordenación, solicitudes de participación y notificaciones internas. Verificado con build de backend y frontend.
+Base **v0.4-social-profiles** con cambios posteriores de filtros, ordenación, solicitudes, notificaciones internas y chat privado con organizador. Verificado con build de backend y frontend.
 
 ### Autenticación
 
@@ -661,6 +720,9 @@ Base **v0.4-social-profiles** con cambios posteriores de filtros, ordenación, s
 - [x] Borrar imagen de actividad (campo vacío no da error de validación).
 - [x] Detalle de actividad con imagen grande o placeholder por categoría.
 - [x] Badge "Creada por ti" para el organizador, "Ya unido" para participantes.
+- [x] Cards con `X/Y plazas`, plazas disponibles y estado `Completa`.
+- [x] Detalle con participantes aceptados, plazas totales y plazas disponibles.
+- [x] Edición de plazas bloqueada si baja de participantes aceptados.
 - [x] Solicitar plaza en vez de unirse directamente.
 - [x] Estado visible de solicitud pendiente y solicitud rechazada.
 - [x] Reintento de solicitud tras rechazo.
@@ -682,9 +744,18 @@ Base **v0.4-social-profiles** con cambios posteriores de filtros, ordenación, s
 - [x] Notificación al creador cuando un usuario solicita plaza.
 - [x] Notificación al solicitante cuando el creador acepta.
 - [x] Notificación al solicitante cuando el creador rechaza.
+- [x] Notificación al recibir mensaje privado sobre una actividad.
 - [x] Contador de notificaciones sin leer en la topbar.
 - [x] Página `/notifications` con listado de pendientes y acción de marcar como leída.
 - [x] Abrir una actividad desde una notificación limpia también el aviso de novedades de la card.
+
+### Chat privado
+
+- [x] Usuario autenticado puede preguntar al organizador desde el detalle.
+- [x] El creador ve "Consultas al organizador" en el detalle.
+- [x] Creador y usuario pueden responder en una conversación privada por actividad.
+- [x] El chat privado no da acceso al chat general ni convierte en participante.
+- [x] Historial privado se conserva aunque luego se acepte al usuario.
 
 ### Chat
 

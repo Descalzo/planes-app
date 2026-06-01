@@ -6,7 +6,11 @@ export type NotificationDocument = HydratedDocument<Notification>;
 export type NotificationType =
   | 'activity_request_created'
   | 'activity_request_accepted'
-  | 'activity_request_rejected';
+  | 'activity_request_rejected'
+  | 'activity_participant_left'
+  | 'activity_participant_removed'
+  | 'private_activity_message'
+  | 'general_chat_message';
 
 @Schema({ timestamps: true })
 export class Notification {
@@ -30,4 +34,3 @@ export class Notification {
 }
 
 export const NotificationSchema = SchemaFactory.createForClass(Notification);
-

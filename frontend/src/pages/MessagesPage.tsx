@@ -6,32 +6,39 @@ import {
   markNotificationAsRead,
 } from '../services/internalNotificationService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
-import { markActivitySeen } from '../services/notificationService';
 
-function getActivityId(notification: InternalNotification) {
-  if (!notification.activity || typeof notification.activity === 'string') {
-    return typeof notification.activity === 'string' ? notification.activity : null;
-  }
-
+function getActivityId(notification: InternalNotification): string | null {
+  if (!notification.activity) return null;
+  if (typeof notification.activity === 'string') return notification.activity;
   return notification.activity._id ?? notification.activity.id ?? null;
 }
 
 function formatDate(value?: string) {
-  if (!value) {
-    return '';
-  }
-
+  if (!value) return '';
   return new Intl.DateTimeFormat('es-ES', {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
 }
 
-function shouldShowNotification(notification: InternalNotification) {
-  return notification.type !== 'private_activity_message' && notification.type !== 'general_chat_message';
+function getChatPath(notification: InternalNotification, activityId: string, currentUserId: string | null): string {
+  if (notification.type === 'private_activity_message') {
+    const actorId = typeof notification.actor === 'object'
+      ? notification.actor?._id ?? notification.actor?.id
+      : notification.actor;
+    if (actorId) {
+      return `/activities/${activityId}/private-chat/${actorId}`;
+    }
+    return `/activities/${activityId}`;
+  }
+  return `/activities/${activityId}/chat`;
 }
 
-export default function NotificationsPage() {
+function isMessageNotification(notification: InternalNotification) {
+  return notification.type === 'private_activity_message' || notification.type === 'general_chat_message';
+}
+
+export default function MessagesPage() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<InternalNotification[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -39,36 +46,57 @@ export default function NotificationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [markingId, setMarkingId] = useState<string | null>(null);
 
+  const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
+
   useEffect(() => {
     let isMounted = true;
 
-    async function loadNotifications() {
+    async function load() {
       try {
         const [data, user] = await Promise.all([fetchNotifications(), fetchCurrentUser()]);
         if (isMounted) {
-          setNotifications(data.filter(shouldShowNotification).filter((n) => !n.readAt));
+          setNotifications(data.filter(isMessageNotification).filter((n) => !n.readAt));
           setCurrentUser(user);
           setError(null);
         }
       } catch {
         if (isMounted) {
-          setError('No se pudieron cargar las notificaciones');
+          setError('No se pudieron cargar los mensajes');
         }
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (isMounted) setIsLoading(false);
       }
     }
 
-    loadNotifications();
-    const intervalId = window.setInterval(loadNotifications, 15000);
+    load();
+    const intervalId = window.setInterval(load, 15000);
+    window.addEventListener('planes:messages-changed', load);
 
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
+      window.removeEventListener('planes:messages-changed', load);
     };
   }, []);
+
+  async function handleOpenChat(notification: InternalNotification) {
+    const activityId = getActivityId(notification);
+    if (!activityId) return;
+
+    setMarkingId(notification._id);
+    setError(null);
+
+    try {
+      await markNotificationAsRead(notification._id);
+      setNotifications((current) => current.filter((n) => n._id !== notification._id));
+      window.dispatchEvent(new Event('planes:messages-changed'));
+      navigate(getChatPath(notification, activityId, currentUserId));
+    } catch {
+      setError('No se pudo abrir el mensaje');
+    } finally {
+      setMarkingId(null);
+    }
+  }
 
   async function handleMarkAsRead(notificationId: string) {
     setMarkingId(notificationId);
@@ -76,26 +104,9 @@ export default function NotificationsPage() {
     try {
       await markNotificationAsRead(notificationId);
       setNotifications((current) => current.filter((n) => n._id !== notificationId));
-      window.dispatchEvent(new Event('planes:notifications-changed'));
+      window.dispatchEvent(new Event('planes:messages-changed'));
     } catch {
-      setError('No se pudo marcar la notificacion como leida');
-    } finally {
-      setMarkingId(null);
-    }
-  }
-
-  async function handleOpenActivity(notification: InternalNotification, activityId: string) {
-    setMarkingId(notification._id);
-    setError(null);
-
-    try {
-      await markNotificationAsRead(notification._id);
-      markActivitySeen(activityId, currentUser?._id ?? currentUser?.id ?? null);
-      setNotifications((current) => current.filter((n) => n._id !== notification._id));
-      window.dispatchEvent(new Event('planes:notifications-changed'));
-      navigate(`/activities/${activityId}`);
-    } catch {
-      setError('No se pudo abrir la notificacion');
+      setError('No se pudo marcar el mensaje como leido');
     } finally {
       setMarkingId(null);
     }
@@ -105,16 +116,16 @@ export default function NotificationsPage() {
     <main className="page page--notifications">
       <header>
         <div>
-          <h1>Notificaciones</h1>
-          <p>Avisos sobre solicitudes y cambios en tus actividades.</p>
+          <h1>Mensajes</h1>
+          <p>Chat general y mensajes privados de tus actividades.</p>
         </div>
       </header>
 
       <section className="notifications-list">
-        {isLoading && <p>Cargando notificaciones...</p>}
+        {isLoading && <p>Cargando mensajes...</p>}
         {error && <p role="alert">{error}</p>}
         {!isLoading && !error && notifications.length === 0 && (
-          <p>No tienes notificaciones todavia.</p>
+          <p>No tienes mensajes nuevos.</p>
         )}
         {notifications.map((notification) => {
           const activityId = getActivityId(notification);
@@ -135,9 +146,9 @@ export default function NotificationsPage() {
                     className="button button--ghost button--small"
                     type="button"
                     disabled={markingId === notification._id}
-                    onClick={() => handleOpenActivity(notification, activityId)}
+                    onClick={() => handleOpenChat(notification)}
                   >
-                    Ver actividad
+                    Ir al chat
                   </button>
                 )}
                 {isUnread && (
@@ -147,7 +158,7 @@ export default function NotificationsPage() {
                     disabled={markingId === notification._id}
                     onClick={() => handleMarkAsRead(notification._id)}
                   >
-                    {markingId === notification._id ? 'Guardando...' : 'Marcar leida'}
+                    {markingId === notification._id ? 'Guardando...' : 'Marcar leido'}
                   </button>
                 )}
               </div>

@@ -663,6 +663,18 @@ button:disabled {
   font-weight: 600;
 }
 
+.activity-card__spots-status {
+  font-weight: 800;
+}
+
+.activity-card__spots-status--available {
+  color: var(--success-text);
+}
+
+.activity-card__spots-status--full {
+  color: var(--danger-text);
+}
+
 .activity-card__date {
   margin: 0.35rem 0 0;
   color: var(--text-2);

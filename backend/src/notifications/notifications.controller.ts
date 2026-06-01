@@ -22,6 +22,25 @@ export class NotificationsController {
     return this.notificationsService.getUnreadCount(user.id).then((count) => ({ count }));
   }
 
+  @Get('unread-messages-count')
+  getUnreadMessagesCount(@CurrentUser() user: { id: string }) {
+    return this.notificationsService.getUnreadMessagesCount(user.id).then((count) => ({ count }));
+  }
+
+  @Patch('status/mark-all-read')
+  markAllStatusRead(@CurrentUser() user: { id: string }) {
+    return this.notificationsService.markAllStatusRead(user.id).then(() => ({ ok: true }));
+  }
+
+  @Patch('messages/read-by-activity/:activityId')
+  @ApiParam({ name: 'activityId', description: 'ID de la actividad', type: String })
+  markMessagesReadByActivity(
+    @Param('activityId', ParseObjectIdPipe) activityId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.notificationsService.markMessagesReadByActivity(activityId, user.id).then(() => ({ ok: true }));
+  }
+
   @Patch(':id/read')
   @ApiParam({ name: 'id', description: 'ID de la notificacion', type: String })
   markAsRead(

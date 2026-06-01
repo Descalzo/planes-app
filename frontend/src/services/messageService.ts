@@ -29,3 +29,7 @@ export async function createMessage(activityId: string, payload: MessageCreateDt
   const response = await api.post<Message>(`/activities/${activityId}/messages`, payload);
   return response.data;
 }
+
+export async function markGeneralChatActive(activityId: string) {
+  await api.patch(`/activities/${activityId}/messages/active`, {});
+}

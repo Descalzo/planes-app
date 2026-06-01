@@ -4,6 +4,8 @@ import MessageInput from '../components/MessageInput';
 import MessageList from '../components/MessageList';
 import { Activity, fetchActivity, isActivityCreator, isUserInActivity } from '../services/activityService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
+import { markGeneralChatActive } from '../services/messageService';
+import { markMessagesReadByActivity } from '../services/internalNotificationService';
 
 export default function ActivityChatPage() {
   const navigate = useNavigate();
@@ -53,6 +55,30 @@ export default function ActivityChatPage() {
 
     return () => {
       isMounted = false;
+    };
+  }, [currentActivityId]);
+
+  useEffect(() => {
+    if (!currentActivityId) return;
+
+    markMessagesReadByActivity(currentActivityId).catch(() => {});
+    window.dispatchEvent(new Event('planes:messages-changed'));
+
+    let isMounted = true;
+    async function pingActive() {
+      try {
+        await markGeneralChatActive(currentActivityId);
+      } catch {
+        if (!isMounted) return;
+      }
+    }
+
+    pingActive();
+    const intervalId = window.setInterval(pingActive, 8000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
     };
   }, [currentActivityId]);
 

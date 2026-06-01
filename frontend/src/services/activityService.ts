@@ -10,6 +10,8 @@ export interface Activity {
   ciudad?: string;
   fecha?: string;
   plazas?: number;
+  plazasOcupadas?: number;
+  plazasDisponibles?: number;
   imagenUrl?: string;
   participantes?: EntityReference[];
   solicitudesPendientes?: EntityReference[];
