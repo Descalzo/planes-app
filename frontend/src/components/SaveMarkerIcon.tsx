@@ -3,7 +3,7 @@ interface SaveMarkerIconProps {
   size?: number;
 }
 
-export default function SaveMarkerIcon({ filled, size = 18 }: SaveMarkerIconProps) {
+export default function SaveMarkerIcon({ filled, size = 28 }: SaveMarkerIconProps) {
   return (
     <span
       aria-hidden="true"
