@@ -30,6 +30,7 @@ import {
   PrivateActivityConversation,
 } from '../services/privateActivityChatService';
 import { getCategoryVisual, getActivityImage } from '../utils/activityImages';
+import SaveMarkerIcon from '../components/SaveMarkerIcon';
 
 function getErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
@@ -317,15 +318,10 @@ export default function ActivityDetailPage() {
           <button
             className={`activity-card__save-btn detail-save-btn${isSaved ? ' activity-card__save-btn--saved' : ''}`}
             type="button"
-            aria-label={isSaved ? 'Quitar de me gusta' : 'Me gusta'}
+            aria-label={isSaved ? 'Quitar de guardadas' : 'Guardar actividad'}
             onClick={handleToggleSave}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-              fill={isSaved ? '#f43f5e' : 'none'}
-              stroke={isSaved ? '#f43f5e' : 'currentColor'}
-              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-            </svg>
+            <SaveMarkerIcon filled={isSaved} size={20} />
           </button>
         )}
       </header>

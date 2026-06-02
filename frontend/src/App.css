@@ -621,7 +621,19 @@ button:disabled {
 }
 
 .activity-card__save-btn--saved {
-  background: rgba(255, 241, 243, 0.95);
+  background: rgba(238, 242, 255, 0.95);
+}
+
+.save-marker-icon {
+  display: block;
+  flex-shrink: 0;
+  background: #94a3b8;
+  mask: url('/location-marker.png') center / contain no-repeat;
+  -webkit-mask: url('/location-marker.png') center / contain no-repeat;
+}
+
+.save-marker-icon--saved {
+  background: linear-gradient(135deg, var(--primary), #2563eb);
 }
 
 .activity-card__content {

@@ -24,7 +24,7 @@ const VIEW_LABELS: Record<View, string> = {
   creadas: 'Creadas por mi',
   unidas: 'Me he unido',
   solicitadas: 'Solicitadas',
-  meGustan: 'Me gustan',
+  meGustan: 'Guardadas',
 };
 
 export default function MyActivitiesPage() {
@@ -171,7 +171,7 @@ export default function MyActivitiesPage() {
     creadas: 'No has creado ninguna actividad todavia.',
     unidas: 'No te has unido a ninguna actividad todavia.',
     solicitadas: 'No tienes solicitudes pendientes ni rechazadas.',
-    meGustan: 'No has marcado ninguna actividad como me gusta todavia.',
+    meGustan: 'No tienes actividades guardadas todavia.',
   };
 
   return (
