@@ -287,10 +287,15 @@ export default function ActivityDetailPage() {
   const isPending = Boolean(activity && currentUserId && isUserPendingInActivity(activity, currentUserId));
   const isRejected = Boolean(activity && currentUserId && isUserRejectedFromActivity(activity, currentUserId));
   const isRemoved = Boolean(activity && currentUserId && isUserRemovedFromActivity(activity, currentUserId));
+  const creatorId = activity ? getReferenceId(activity.creador) : null;
   const visibleParticipants = activity
-    ? [activity.creador, ...(activity.participantes ?? [])].filter((participant, index, allParticipants) => {
+    ? (activity.participantes ?? []).filter((participant, index, allParticipants) => {
         const participantId = getReferenceId(participant);
-        return Boolean(participantId) && allParticipants.findIndex((item) => getReferenceId(item) === participantId) === index;
+        return (
+          Boolean(participantId) &&
+          participantId !== creatorId &&
+          allParticipants.findIndex((item) => getReferenceId(item) === participantId) === index
+        );
       })
     : [];
   const usersWhoLeft = activity?.salidas ?? [];
@@ -425,7 +430,7 @@ export default function ActivityDetailPage() {
                 )}
                 <h2>Participantes</h2>
                 <div className="participants-list">
-                  {(activity.participantes ?? [])
+                  {visibleParticipants
                     .map((participant) => {
                       const participantId = getReferenceId(participant);
                       const isCurrentCreator = participantId === currentUserId;
@@ -568,7 +573,7 @@ export default function ActivityDetailPage() {
               <div className="participants-panel">
                 <h2>Participantes</h2>
                 <div className="participants-list">
-                  {(activity.participantes ?? [])
+                  {visibleParticipants
                     .filter((p) => getReferenceId(p) !== currentUserId)
                     .map((participant) => {
                       const participantId = getReferenceId(participant);

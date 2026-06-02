@@ -151,7 +151,8 @@ export default function Navigation() {
       <header className="topbar">
         <nav className="topbar__inner" aria-label="Navegacion principal">
           <Link className="topbar__brand" to={hasToken ? '/activities' : '/login'}>
-            Planes
+            <img className="topbar__brand-icon" src="/logo-app.png" alt="" aria-hidden="true" />
+            <span>Planes</span>
           </Link>
           <div className="topbar__links">
             {hasToken ? (

@@ -37,6 +37,10 @@ export default function UserPublicProfilePage() {
   const activityId = rawActivityId && rawActivityId !== 'undefined' && rawActivityId !== 'null' ? rawActivityId : undefined;
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [userId, activityId]);
+
+  useEffect(() => {
     if (!userId) {
       setIsLoading(false);
       setError('Usuario no válido');
