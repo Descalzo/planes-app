@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Planes</title>
+    <script>
+      (function () {
+        try {
+          var s = localStorage.getItem('planes-theme');
+          var t = s === 'dark' || s === 'light' ? s
+            : window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
 
     <!-- PWA -->
     <meta name="theme-color" content="#6366f1" />

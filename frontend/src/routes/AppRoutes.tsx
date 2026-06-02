@@ -13,6 +13,7 @@ import NotificationsPage from '../pages/NotificationsPage';
 import MessagesPage from '../pages/MessagesPage';
 import PrivateActivityChatPage from '../pages/PrivateActivityChatPage';
 import PrivateConversationsPage from '../pages/PrivateConversationsPage';
+import SettingsPage from '../pages/SettingsPage';
 import { getAuthToken } from '../services/api';
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
@@ -122,6 +123,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <UserPublicProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <SettingsPage />
           </ProtectedRoute>
         }
       />

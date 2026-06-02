@@ -25,9 +25,7 @@ button {
   cursor: pointer;
 }
 
-@media (prefers-color-scheme: dark) {
-  body {
-    background: #0f172a;
-    color: #f1f5f9;
-  }
+[data-theme="dark"] body {
+  background: #0f172a;
+  color: #f1f5f9;
 }
