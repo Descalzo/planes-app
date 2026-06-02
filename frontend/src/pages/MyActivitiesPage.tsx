@@ -136,10 +136,12 @@ export default function MyActivitiesPage() {
 
     loadUnreadMessages();
     const intervalId = window.setInterval(loadUnreadMessages, 5000);
+    window.addEventListener('planes:messages-changed', loadUnreadMessages);
 
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
+      window.removeEventListener('planes:messages-changed', loadUnreadMessages);
     };
   }, [chatActivities, currentUserId]);
 

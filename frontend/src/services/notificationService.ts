@@ -32,6 +32,10 @@ export function markChatSeen(activityId: string, userId: string | null | undefin
   localStorage.setItem(getScopedKey(CHAT_SEEN_PREFIX, activityId, userId), String(latestMessageTime || Date.now()));
 }
 
+export function markChatSeenNow(activityId: string, userId: string | null | undefined) {
+  localStorage.setItem(getScopedKey(CHAT_SEEN_PREFIX, activityId, userId), String(Date.now()));
+}
+
 export function hasUnreadMessages(activityId: string, messages: Message[], currentUserId?: string | null) {
   const lastSeen = getStoredTime(getScopedKey(CHAT_SEEN_PREFIX, activityId, currentUserId));
 

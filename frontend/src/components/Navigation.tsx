@@ -158,6 +158,14 @@ export default function Navigation() {
             {hasToken ? (
               <>
                 <Link
+                  className="topbar__icon-link topbar__create-link"
+                  to="/activities/new"
+                  title="Crear actividad"
+                  aria-label="Crear actividad"
+                >
+                  <PlusIcon />
+                </Link>
+                <Link
                   className="topbar__icon-link"
                   to="/messages"
                   title="Mensajes"
@@ -212,9 +220,6 @@ export default function Navigation() {
             <MyPlansIcon />
             <span>Mis planes</span>
           </NavLink>
-          <Link className="bottom-nav__fab" to="/activities/new" aria-label="Crear actividad">
-            <PlusIcon />
-          </Link>
           <NavLink className={navItemClass} to="/profile">
             <ProfileIcon />
             <span>Perfil</span>

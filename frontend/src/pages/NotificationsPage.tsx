@@ -70,12 +70,17 @@ export default function NotificationsPage() {
     };
   }, []);
 
-  async function handleMarkAsRead(notificationId: string) {
-    setMarkingId(notificationId);
+  async function handleMarkAsRead(notification: InternalNotification) {
+    const activityId = getActivityId(notification);
+
+    setMarkingId(notification._id);
     setError(null);
     try {
-      await markNotificationAsRead(notificationId);
-      setNotifications((current) => current.filter((n) => n._id !== notificationId));
+      await markNotificationAsRead(notification._id);
+      if (activityId) {
+        markActivitySeen(activityId, currentUser?._id ?? currentUser?.id ?? null);
+      }
+      setNotifications((current) => current.filter((n) => n._id !== notification._id));
       window.dispatchEvent(new Event('planes:notifications-changed'));
     } catch {
       setError('No se pudo marcar la notificacion como leida');
@@ -145,7 +150,7 @@ export default function NotificationsPage() {
                     className="button button--secondary button--small"
                     type="button"
                     disabled={markingId === notification._id}
-                    onClick={() => handleMarkAsRead(notification._id)}
+                    onClick={() => handleMarkAsRead(notification)}
                   >
                     {markingId === notification._id ? 'Guardando...' : 'Marcar leida'}
                   </button>

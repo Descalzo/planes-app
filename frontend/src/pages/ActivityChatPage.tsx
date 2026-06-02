@@ -6,6 +6,7 @@ import { Activity, fetchActivity, isActivityCreator, isUserInActivity } from '..
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
 import { fetchMessages, Message, markGeneralChatActive } from '../services/messageService';
 import { markMessagesReadByActivity } from '../services/internalNotificationService';
+import { markChatSeen, markChatSeenNow } from '../services/notificationService';
 import { getSocket } from '../services/socketService';
 
 export default function ActivityChatPage() {
@@ -49,6 +50,7 @@ export default function ActivityChatPage() {
           setCurrentUser(userData);
           messagesData.forEach((m) => seenIds.current.add(m._id));
           setMessages(messagesData);
+          markChatSeen(currentActivityId, userData._id ?? userData.id ?? null, messagesData);
           setError(null);
         }
       } catch {
@@ -66,6 +68,7 @@ export default function ActivityChatPage() {
   useEffect(() => {
     if (!currentActivityId) return;
     markMessagesReadByActivity(currentActivityId).catch(() => {});
+    markChatSeenNow(currentActivityId, currentUserId);
     window.dispatchEvent(new Event('planes:messages-changed'));
 
     let isMounted = true;
@@ -75,7 +78,7 @@ export default function ActivityChatPage() {
     pingActive();
     const intervalId = window.setInterval(pingActive, 8000);
     return () => { isMounted = false; window.clearInterval(intervalId); };
-  }, [currentActivityId]);
+  }, [currentActivityId, currentUserId]);
 
   // WebSocket setup — runs after access is confirmed
   useEffect(() => {
@@ -87,6 +90,9 @@ export default function ActivityChatPage() {
       if (seenIds.current.has(message._id)) return;
       seenIds.current.add(message._id);
       setMessages((prev) => [...prev, message]);
+      markChatSeenNow(currentActivityId, currentUserId);
+      markMessagesReadByActivity(currentActivityId).catch(() => {});
+      window.dispatchEvent(new Event('planes:messages-changed'));
     }
 
     function joinRoom() {
@@ -111,7 +117,7 @@ export default function ActivityChatPage() {
       socket.off('disconnect');
       setSocketConnected(false);
     };
-  }, [currentActivityId, canAccessChat]);
+  }, [currentActivityId, canAccessChat, currentUserId]);
 
   async function handleSend(text: string) {
     const socket = getSocket();

@@ -6,6 +6,7 @@ import {
   markNotificationAsRead,
 } from '../services/internalNotificationService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
+import { markChatSeenNow, markPrivateChatSeen } from '../services/notificationService';
 
 function getActivityId(notification: InternalNotification): string | null {
   if (!notification.activity) return null;
@@ -36,6 +37,28 @@ function getChatPath(notification: InternalNotification, activityId: string, cur
 
 function isMessageNotification(notification: InternalNotification) {
   return notification.type === 'private_activity_message' || notification.type === 'general_chat_message';
+}
+
+function getActorId(notification: InternalNotification): string | null {
+  if (!notification.actor) return null;
+  if (typeof notification.actor === 'string') return notification.actor;
+  return notification.actor._id ?? notification.actor.id ?? null;
+}
+
+function markMessageNotificationSeenLocally(
+  notification: InternalNotification,
+  activityId: string,
+  currentUserId: string | null,
+) {
+  if (notification.type === 'private_activity_message') {
+    const actorId = getActorId(notification);
+    if (actorId) {
+      markPrivateChatSeen(activityId, actorId, currentUserId);
+    }
+    return;
+  }
+
+  markChatSeenNow(activityId, currentUserId);
 }
 
 export default function MessagesPage() {
@@ -88,6 +111,7 @@ export default function MessagesPage() {
 
     try {
       await markNotificationAsRead(notification._id);
+      markMessageNotificationSeenLocally(notification, activityId, currentUserId);
       setNotifications((current) => current.filter((n) => n._id !== notification._id));
       window.dispatchEvent(new Event('planes:messages-changed'));
       navigate(getChatPath(notification, activityId, currentUserId));
@@ -98,12 +122,17 @@ export default function MessagesPage() {
     }
   }
 
-  async function handleMarkAsRead(notificationId: string) {
-    setMarkingId(notificationId);
+  async function handleMarkAsRead(notification: InternalNotification) {
+    const activityId = getActivityId(notification);
+
+    setMarkingId(notification._id);
     setError(null);
     try {
-      await markNotificationAsRead(notificationId);
-      setNotifications((current) => current.filter((n) => n._id !== notificationId));
+      await markNotificationAsRead(notification._id);
+      if (activityId) {
+        markMessageNotificationSeenLocally(notification, activityId, currentUserId);
+      }
+      setNotifications((current) => current.filter((n) => n._id !== notification._id));
       window.dispatchEvent(new Event('planes:messages-changed'));
     } catch {
       setError('No se pudo marcar el mensaje como leido');
@@ -156,7 +185,7 @@ export default function MessagesPage() {
                     className="button button--secondary button--small"
                     type="button"
                     disabled={markingId === notification._id}
-                    onClick={() => handleMarkAsRead(notification._id)}
+                    onClick={() => handleMarkAsRead(notification)}
                   >
                     {markingId === notification._id ? 'Guardando...' : 'Marcar leido'}
                   </button>

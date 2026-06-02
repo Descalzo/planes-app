@@ -67,13 +67,14 @@ export default function ActivityCard({
   const visual = getCategoryVisual(category);
   const [imgError, setImgError] = useState(false);
   const imageUrl = getActivityImage(imagenUrl, category);
+  const isDefaultImage = !imagenUrl?.trim();
 
   return (
     <article className={cardClassName}>
       <div className="activity-card__media">
         {!imgError ? (
           <img
-            className="activity-card__image"
+            className={`activity-card__image${isDefaultImage ? ' activity-card__image--default' : ''}`}
             src={imageUrl}
             alt={title}
             onError={() => setImgError(true)}
