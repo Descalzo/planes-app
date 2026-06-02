@@ -19,6 +19,7 @@ import { CurrentUser, fetchCurrentUser } from '../services/authService';
 import { fetchMessages } from '../services/messageService';
 import { hasActivityUpdates, hasUnreadMessages } from '../services/notificationService';
 import { CATEGORIES, CATEGORY_VISUALS } from '../utils/activityImages';
+import { PROVINCIAS } from '../utils/provincias';
 
 function SkeletonActivityCard() {
   return (
@@ -54,7 +55,7 @@ export default function ActivitiesPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [unreadMessageActivityIds, setUnreadMessageActivityIds] = useState<Set<string>>(new Set());
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [cityFilter, setCityFilter] = useState('');
+  const [zonaPrincipalFilter, setZonaPrincipalFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<ActivityStatusFilter>('futuras');
   const [sort, setSort] = useState<ActivitySort>('fechaAsc');
   const [savedActivityIds, setSavedActivityIds] = useState<Set<string>>(new Set());
@@ -71,7 +72,7 @@ export default function ActivitiesPage() {
         const [activitiesData, userData, savedData] = await Promise.all([
           fetchActivities({
             categoria: selectedCategory,
-            ciudad: cityFilter.trim(),
+            zonaPrincipal: zonaPrincipalFilter || undefined,
             estado: statusFilter,
             sort,
           }),
@@ -107,7 +108,7 @@ export default function ActivitiesPage() {
       isMounted = false;
       window.clearInterval(intervalId);
     };
-  }, [selectedCategory, cityFilter, statusFilter, sort]);
+  }, [selectedCategory, zonaPrincipalFilter, statusFilter, sort]);
 
   const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
 
@@ -131,19 +132,19 @@ export default function ActivitiesPage() {
       });
     }
   }
-  const sectionTitle = selectedCategory || cityFilter.trim()
+  const sectionTitle = selectedCategory || zonaPrincipalFilter
     ? 'Resultados filtrados'
     : statusFilter === 'pasadas'
       ? 'Actividades pasadas'
       : statusFilter === 'todas'
         ? 'Todas las actividades'
         : 'Proximas actividades';
-  const emptyMessage = selectedCategory || cityFilter.trim()
+  const emptyMessage = selectedCategory || zonaPrincipalFilter
     ? 'No hay actividades que coincidan con los filtros seleccionados.'
     : statusFilter === 'pasadas'
       ? 'No hay actividades pasadas.'
       : 'No hay actividades proximas todavia.';
-  const activeFiltersCount = [cityFilter.trim(), statusFilter !== 'futuras' ? statusFilter : '', sort !== 'fechaAsc' ? sort : '']
+  const activeFiltersCount = [zonaPrincipalFilter, statusFilter !== 'futuras' ? statusFilter : '', sort !== 'fechaAsc' ? sort : '']
     .filter(Boolean).length;
 
   useEffect(() => {
@@ -239,13 +240,11 @@ export default function ActivitiesPage() {
             {showFilters && (
               <div className="activity-filters">
                 <label>
-                  Ciudad
-                  <input
-                    type="search"
-                    value={cityFilter}
-                    onChange={(event) => setCityFilter(event.target.value)}
-                    placeholder="Ej. Madrid"
-                  />
+                  Provincia / zona
+                  <select value={zonaPrincipalFilter} onChange={(event) => setZonaPrincipalFilter(event.target.value)}>
+                    <option value="">Todas</option>
+                    {PROVINCIAS.map((p) => <option key={p}>{p}</option>)}
+                  </select>
                 </label>
                 <label>
                   Estado
@@ -292,6 +291,7 @@ export default function ActivitiesPage() {
                 title={activity.titulo}
                 category={activity.categoria}
                 city={activity.ciudad}
+                zonaPrincipal={activity.zonaPrincipal}
                 date={activity.fecha}
                 spots={activity.plazas}
                 occupiedSpots={activity.plazasOcupadas}

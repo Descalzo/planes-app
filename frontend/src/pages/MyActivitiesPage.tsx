@@ -184,7 +184,6 @@ export default function MyActivitiesPage() {
           <p>Planes que has creado, solicitado, guardado o a los que te has unido.</p>
         </div>
         <div className="page-actions">
-          <Link className="button button--secondary" to="/activities">Explorar</Link>
           <Link className="button button--primary" to="/activities/new">Crear actividad</Link>
         </div>
       </header>
@@ -235,6 +234,7 @@ export default function MyActivitiesPage() {
                 title={activity.titulo}
                 category={activity.categoria}
                 city={activity.ciudad}
+                zonaPrincipal={activity.zonaPrincipal}
                 date={activity.fecha}
                 spots={activity.plazas}
                 occupiedSpots={activity.plazasOcupadas}

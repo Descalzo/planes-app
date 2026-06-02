@@ -13,6 +13,7 @@ type ActivitiesSort = 'fechaAsc' | 'createdDesc' | 'createdAsc';
 interface FindAllActivitiesOptions {
   categoria?: string;
   ciudad?: string;
+  zonaPrincipal?: string;
   estado?: string;
   sort?: string;
 }
@@ -160,7 +161,7 @@ export class ActivitiesService {
       throw new ForbiddenException('Solo el creador puede editar esta actividad');
     }
 
-    const { titulo, descripcion, categoria, ciudad, fecha, plazas, imagenUrl } = dto;
+    const { titulo, descripcion, categoria, ciudad, zonaPrincipal, fecha, plazas, imagenUrl } = dto;
     if (plazas !== undefined && plazas < this.getPlazasOcupadas(activity)) {
       throw new BadRequestException('No puedes poner menos plazas que participantes aceptados');
     }
@@ -169,6 +170,7 @@ export class ActivitiesService {
     if (descripcion !== undefined) activity.descripcion = descripcion;
     if (categoria !== undefined) activity.categoria = categoria;
     if (ciudad !== undefined) activity.ciudad = ciudad;
+    if (zonaPrincipal !== undefined) activity.zonaPrincipal = zonaPrincipal;
     if (fecha !== undefined) activity.fecha = new Date(fecha);
     if (plazas !== undefined) activity.plazas = plazas;
     if (imagenUrl !== undefined) activity.imagenUrl = imagenUrl;
@@ -185,6 +187,7 @@ export class ActivitiesService {
     const sort = this.getSort(options.sort);
     const categoria = options.categoria?.trim();
     const ciudad = options.ciudad?.trim();
+    const zonaPrincipal = options.zonaPrincipal?.trim();
 
     if (categoria) {
       filter.categoria = categoria;
@@ -192,6 +195,10 @@ export class ActivitiesService {
 
     if (ciudad) {
       filter.ciudad = { $regex: this.escapeRegex(ciudad), $options: 'i' };
+    }
+
+    if (zonaPrincipal) {
+      filter.zonaPrincipal = zonaPrincipal;
     }
 
     if (status === 'futuras') {

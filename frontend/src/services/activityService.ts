@@ -8,6 +8,7 @@ export interface Activity {
   descripcion?: string;
   categoria?: string;
   ciudad?: string;
+  zonaPrincipal?: string;
   fecha?: string;
   plazas?: number;
   plazasOcupadas?: number;
@@ -30,6 +31,7 @@ export interface ActivityCreateDto {
   descripcion?: string;
   categoria?: string;
   ciudad?: string;
+  zonaPrincipal?: string;
   fecha?: string;
   plazas?: number;
   imagenUrl?: string;
@@ -40,6 +42,7 @@ export interface ActivityUpdateDto {
   descripcion?: string;
   categoria?: string;
   ciudad?: string;
+  zonaPrincipal?: string;
   fecha?: string;
   plazas?: number;
   imagenUrl?: string;
@@ -51,6 +54,7 @@ export type ActivitySort = 'fechaAsc' | 'createdDesc' | 'createdAsc';
 export interface ActivityFilters {
   categoria?: string;
   ciudad?: string;
+  zonaPrincipal?: string;
   estado?: ActivityStatusFilter;
   sort?: ActivitySort;
 }

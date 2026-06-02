@@ -19,6 +19,9 @@ export class Activity {
   ciudad: string;
 
   @Prop()
+  zonaPrincipal: string;
+
+  @Prop()
   fecha: Date;
 
   @Prop({ default: 10 })

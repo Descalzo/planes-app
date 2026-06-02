@@ -8,6 +8,7 @@ interface ActivityCardProps {
   title: string;
   category?: string;
   city?: string;
+  zonaPrincipal?: string;
   date?: string;
   spots?: number;
   occupiedSpots?: number;
@@ -31,6 +32,7 @@ export default function ActivityCard({
   title,
   category,
   city,
+  zonaPrincipal,
   date,
   spots,
   occupiedSpots,
@@ -111,7 +113,7 @@ export default function ActivityCard({
       </div>
       <div className="activity-card__content">
         <div className="activity-card__topline">
-          <p className="activity-card__meta">{[category, city].filter(Boolean).join(' · ') || 'Sin categoria'}</p>
+          <p className="activity-card__meta">{[category, zonaPrincipal || city].filter(Boolean).join(' · ') || 'Sin categoria'}</p>
           {isCreator
             ? <span className="activity-card__badge activity-card__badge--creator">Creada por ti</span>
             : requestStatus === 'pending'

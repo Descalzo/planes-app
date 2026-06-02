@@ -23,10 +23,11 @@ export class ActivitiesController {
   findAll(
     @Query('categoria') categoria?: string,
     @Query('ciudad') ciudad?: string,
+    @Query('zonaPrincipal') zonaPrincipal?: string,
     @Query('estado') estado?: string,
     @Query('sort') sort?: string,
   ) {
-    return this.activitiesService.findAll({ categoria, ciudad, estado, sort });
+    return this.activitiesService.findAll({ categoria, ciudad, zonaPrincipal, estado, sort });
   }
 
   @Get('saved')

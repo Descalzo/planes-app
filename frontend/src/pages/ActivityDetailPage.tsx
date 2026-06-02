@@ -358,7 +358,8 @@ export default function ActivityDetailPage() {
             <p className="detail-card__description">{activity.descripcion || 'Sin descripcion'}</p>
             <div className="detail-grid">
               <p><span>Categoria</span>{activity.categoria || 'Sin categoria'}</p>
-              <p><span>Ciudad</span>{activity.ciudad || 'Sin ciudad'}</p>
+              {activity.zonaPrincipal && <p><span>Provincia</span>{activity.zonaPrincipal}</p>}
+              {activity.ciudad && <p><span>Lugar</span>{activity.ciudad}</p>}
               {activity.fecha && <p><span>Fecha</span>{new Date(activity.fecha).toLocaleString()}</p>}
               <p><span>Participantes aceptados</span>{acceptedParticipants}</p>
               <p><span>Plazas totales</span>{totalSpots}</p>

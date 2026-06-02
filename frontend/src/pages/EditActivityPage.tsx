@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Activity, fetchActivity, updateActivity } from '../services/activityService';
 import { CATEGORIES } from '../utils/activityImages';
+import { PROVINCIAS } from '../utils/provincias';
 import ImageUploadField from '../components/ImageUploadField';
 
 function getErrorMessage(error: unknown) {
@@ -33,6 +34,7 @@ export default function EditActivityPage() {
   const [date, setDate] = useState('');
   const [spots, setSpots] = useState('');
   const [acceptedParticipants, setAcceptedParticipants] = useState(0);
+  const [zonaPrincipal, setZonaPrincipal] = useState('');
   const [imagenUrl, setImagenUrl] = useState('');
   const [isImageUploading, setIsImageUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,6 +52,7 @@ export default function EditActivityPage() {
         setDate(toLocalDatetime(activity.fecha));
         setSpots(activity.plazas ? String(activity.plazas) : '');
         setAcceptedParticipants(activity.plazasOcupadas ?? activity.participantes?.length ?? 0);
+        setZonaPrincipal(activity.zonaPrincipal ?? '');
         setImagenUrl(activity.imagenUrl ?? '');
       })
       .catch(() => setError('No se pudo cargar la actividad'))
@@ -72,6 +75,7 @@ export default function EditActivityPage() {
         descripcion: description || undefined,
         categoria: category || undefined,
         ciudad: city || undefined,
+        zonaPrincipal: zonaPrincipal || undefined,
         fecha: date ? new Date(date).toISOString() : undefined,
         plazas: spots ? Number(spots) : undefined,
         imagenUrl: imagenUrl || undefined,
@@ -110,8 +114,15 @@ export default function EditActivityPage() {
           </select>
         </label>
         <label>
-          Ciudad
-          <input value={city} onChange={(e) => setCity(e.target.value)} />
+          Provincia / zona
+          <select value={zonaPrincipal} onChange={(e) => setZonaPrincipal(e.target.value)}>
+            <option value="">Sin especificar</option>
+            {PROVINCIAS.map((p) => <option key={p}>{p}</option>)}
+          </select>
+        </label>
+        <label>
+          Lugar concreto
+          <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej. Dos Hermanas, Triana, Centro..." />
         </label>
         <label>
           Fecha
@@ -128,15 +139,6 @@ export default function EditActivityPage() {
           {acceptedParticipants > 0 && (
             <span className="field-hint">Minimo {acceptedParticipants}: participantes aceptados actuales.</span>
           )}
-        </label>
-        <label>
-          Imagen (URL opcional)
-          <input
-            type="url"
-            value={imagenUrl}
-            onChange={(e) => setImagenUrl(e.target.value)}
-            placeholder="https://example.com/imagen.jpg"
-          />
         </label>
         <ImageUploadField
           id="activity-image-upload"

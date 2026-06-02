@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createActivity } from '../services/activityService';
 import { CATEGORIES } from '../utils/activityImages';
+import { PROVINCIAS } from '../utils/provincias';
 import ImageUploadField from './ImageUploadField';
 
 function getErrorMessage(error: unknown) {
@@ -21,6 +22,7 @@ export default function ActivityForm() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
+  const [zonaPrincipal, setZonaPrincipal] = useState('');
   const [city, setCity] = useState('');
   const [date, setDate] = useState('');
   const [spots, setSpots] = useState('10');
@@ -38,6 +40,7 @@ export default function ActivityForm() {
         titulo: title,
         descripcion: description || undefined,
         categoria: category || undefined,
+        zonaPrincipal: zonaPrincipal || undefined,
         ciudad: city || undefined,
         fecha: date ? new Date(date).toISOString() : undefined,
         plazas: spots ? Number(spots) : undefined,
@@ -69,8 +72,15 @@ export default function ActivityForm() {
         </select>
       </label>
       <label>
-        Ciudad
-        <input value={city} onChange={(e) => setCity(e.target.value)} />
+        Provincia / zona
+        <select value={zonaPrincipal} onChange={(e) => setZonaPrincipal(e.target.value)}>
+          <option value="">Sin especificar</option>
+          {PROVINCIAS.map((p) => <option key={p}>{p}</option>)}
+        </select>
+      </label>
+      <label>
+        Lugar concreto
+        <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej. Dos Hermanas, Triana, Centro..." />
       </label>
       <label>
         Fecha
@@ -79,15 +89,6 @@ export default function ActivityForm() {
       <label>
         Plazas
         <input min="1" type="number" value={spots} onChange={(e) => setSpots(e.target.value)} />
-      </label>
-      <label>
-        Imagen (URL opcional)
-        <input
-          type="url"
-          value={imagenUrl}
-          onChange={(e) => setImagenUrl(e.target.value)}
-          placeholder="https://example.com/imagen.jpg"
-        />
       </label>
       <ImageUploadField
         id="activity-image-upload"

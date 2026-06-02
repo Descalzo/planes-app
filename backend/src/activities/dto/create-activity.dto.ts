@@ -22,6 +22,11 @@ export class CreateActivityDto {
   @IsOptional()
   ciudad?: string;
 
+  @ApiPropertyOptional({ example: 'Sevilla' })
+  @IsString()
+  @IsOptional()
+  zonaPrincipal?: string;
+
   @ApiPropertyOptional({ example: '2026-06-10T09:00:00.000Z' })
   @IsDateString()
   @IsOptional()
