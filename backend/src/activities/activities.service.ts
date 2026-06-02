@@ -78,8 +78,12 @@ export class ActivitiesService {
       const plainActivity = activity.toObject();
       const creatorId = this.getValidObjectId(activity.creador);
 
+      const estado: 'activa' | 'finalizada' =
+        activity.fecha && new Date(activity.fecha).getTime() < Date.now() ? 'finalizada' : 'activa';
+
       return {
         ...plainActivity,
+        estado,
         plazas: this.getPlazasTotales(activity),
         plazasOcupadas: this.getPlazasOcupadas(activity),
         plazasDisponibles: Math.max(this.getPlazasTotales(activity) - this.getPlazasOcupadas(activity), 0),
@@ -181,7 +185,7 @@ export class ActivitiesService {
   }
 
   async findAll(options: FindAllActivitiesOptions = {}): Promise<any[]> {
-    const filter: Record<string, unknown> = {};
+    const andClauses: Record<string, unknown>[] = [];
     const now = new Date();
     const status = this.getStatusFilter(options.estado);
     const sort = this.getSort(options.sort);
@@ -190,22 +194,31 @@ export class ActivitiesService {
     const zonaPrincipal = options.zonaPrincipal?.trim();
 
     if (categoria) {
-      filter.categoria = categoria;
+      andClauses.push({ categoria });
     }
 
     if (ciudad) {
-      filter.ciudad = { $regex: this.escapeRegex(ciudad), $options: 'i' };
+      andClauses.push({ ciudad: { $regex: this.escapeRegex(ciudad), $options: 'i' } });
     }
 
     if (zonaPrincipal) {
-      filter.zonaPrincipal = zonaPrincipal;
+      // Search both zonaPrincipal (new field) and ciudad (legacy field) so older
+      // activities created before zonaPrincipal existed are also returned.
+      andClauses.push({
+        $or: [
+          { zonaPrincipal: { $regex: this.escapeRegex(zonaPrincipal), $options: 'i' } },
+          { ciudad: { $regex: this.escapeRegex(zonaPrincipal), $options: 'i' } },
+        ],
+      });
     }
 
     if (status === 'futuras') {
-      filter.$or = [{ fecha: { $gte: now } }, { fecha: { $exists: false } }, { fecha: null }];
+      andClauses.push({ $or: [{ fecha: { $gte: now } }, { fecha: { $exists: false } }, { fecha: null }] });
     } else if (status === 'pasadas') {
-      filter.fecha = { $lt: now };
+      andClauses.push({ fecha: { $lt: now } });
     }
+
+    const filter = andClauses.length > 0 ? { $and: andClauses } : {};
 
     let query = this.activityModel.find(filter);
     if (sort === 'createdDesc') {

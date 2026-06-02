@@ -24,7 +24,8 @@ import {
   unsaveActivity,
 } from '../services/activityService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
-import { markActivitySeen, hasUnseenPrivateConversations } from '../services/notificationService';
+import { fetchUnreadPrivateMessageActorIds } from '../services/internalNotificationService';
+import { markActivitySeen } from '../services/notificationService';
 import {
   fetchPrivateActivityConversations,
   PrivateActivityConversation,
@@ -58,6 +59,7 @@ export default function ActivityDetailPage() {
   const [unbanningParticipantId, setUnbanningParticipantId] = useState<string | null>(null);
   const [requestActionId, setRequestActionId] = useState<string | null>(null);
   const [privateConversations, setPrivateConversations] = useState<PrivateActivityConversation[]>([]);
+  const [unreadPrivateActorIds, setUnreadPrivateActorIds] = useState<Set<string>>(new Set());
   const [isSaved, setIsSaved] = useState(false);
   const [detailImgError, setDetailImgError] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,6 +125,7 @@ export default function ActivityDetailPage() {
   useEffect(() => {
     if (!activityId || !activity || !currentUserId || !isActivityCreator(activity, currentUserId)) {
       setPrivateConversations([]);
+      setUnreadPrivateActorIds(new Set());
       return;
     }
 
@@ -131,23 +134,30 @@ export default function ActivityDetailPage() {
 
     async function loadPrivateConversations() {
       try {
-        const conversations = await fetchPrivateActivityConversations(currentActivityId);
+        const [conversations, actorIds] = await Promise.all([
+          fetchPrivateActivityConversations(currentActivityId),
+          fetchUnreadPrivateMessageActorIds(currentActivityId),
+        ]);
         if (isMounted) {
           setPrivateConversations(conversations);
+          setUnreadPrivateActorIds(new Set(actorIds));
         }
       } catch {
         if (isMounted) {
           setPrivateConversations([]);
+          setUnreadPrivateActorIds(new Set());
         }
       }
     }
 
     loadPrivateConversations();
     const intervalId = window.setInterval(loadPrivateConversations, 10000);
+    window.addEventListener('planes:messages-changed', loadPrivateConversations);
 
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
+      window.removeEventListener('planes:messages-changed', loadPrivateConversations);
     };
   }, [activityId, activity, currentUserId]);
 
@@ -671,10 +681,10 @@ export default function ActivityDetailPage() {
               )}
               {isCreator && activityId && (
                 <Link
-                  className={`button button--ghost${hasUnseenPrivateConversations(privateConversations, currentUserId, activityId) ? ' button--has-badge' : ''}`}
+                  className={`button button--ghost${unreadPrivateActorIds.size > 0 ? ' button--has-badge' : ''}`}
                   to={`/activities/${activityId}/conversations`}
                 >
-                  {hasUnseenPrivateConversations(privateConversations, currentUserId, activityId) && (
+                  {unreadPrivateActorIds.size > 0 && (
                     <span className="button-badge" aria-label="Mensajes nuevos">●</span>
                   )}
                   Consultas privadas{privateConversations.length > 0 ? ` (${privateConversations.length})` : ''}

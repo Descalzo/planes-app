@@ -128,6 +128,9 @@ export default function PrivateActivityChatPage() {
       if (seenIds.current.has(message._id)) return;
       seenIds.current.add(message._id);
       setMessages((prev) => [...prev, message]);
+      markPrivateChatSeen(currentActivityId, conversationUserId, currentUserId);
+      markMessagesReadByActivity(currentActivityId).catch(() => {});
+      window.dispatchEvent(new Event('planes:messages-changed'));
     }
 
     function joinRoom() {

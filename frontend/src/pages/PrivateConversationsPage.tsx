@@ -5,9 +5,8 @@ import {
   PrivateActivityConversation,
 } from '../services/privateActivityChatService';
 import { Activity, fetchActivity, getReferenceId, getReferenceName, isActivityCreator } from '../services/activityService';
-import { CurrentUser, fetchCurrentUser } from '../services/authService';
-import { markPrivateChatSeen } from '../services/notificationService';
-import { markMessagesReadByActivity } from '../services/internalNotificationService';
+import { fetchCurrentUser } from '../services/authService';
+import { fetchUnreadPrivateMessageActorIds, markMessagesReadByActivity } from '../services/internalNotificationService';
 
 function formatDate(value?: string) {
   if (!value) return '';
@@ -26,14 +25,12 @@ export default function PrivateConversationsPage() {
   const { activityId } = useParams();
   const navigate = useNavigate();
   const [activity, setActivity] = useState<Activity | null>(null);
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [conversations, setConversations] = useState<PrivateActivityConversation[]>([]);
+  const [unreadPrivateActorIds, setUnreadPrivateActorIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const currentActivityId = activityId ?? '';
-  const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
-
   useEffect(() => {
     if (!currentActivityId) return;
 
@@ -41,10 +38,11 @@ export default function PrivateConversationsPage() {
 
     async function load() {
       try {
-        const [activityData, userData, convData] = await Promise.all([
+        const [activityData, userData, convData, actorIds] = await Promise.all([
           fetchActivity(currentActivityId),
           fetchCurrentUser(),
           fetchPrivateActivityConversations(currentActivityId),
+          fetchUnreadPrivateMessageActorIds(currentActivityId),
         ]);
 
         if (isMounted) {
@@ -55,11 +53,15 @@ export default function PrivateConversationsPage() {
             return;
           }
           setActivity(activityData);
-          setCurrentUser(userData);
           setConversations(convData);
+          setUnreadPrivateActorIds(new Set(actorIds));
           // Marca todas las notificaciones de mensaje privado como leídas
-          markMessagesReadByActivity(currentActivityId).catch(() => {});
-          window.dispatchEvent(new Event('planes:messages-changed'));
+          markMessagesReadByActivity(currentActivityId)
+            .then(() => {
+              setUnreadPrivateActorIds(new Set());
+              window.dispatchEvent(new Event('planes:messages-changed'));
+            })
+            .catch(() => {});
           setError(null);
         }
       } catch {
@@ -72,8 +74,14 @@ export default function PrivateConversationsPage() {
     load();
     const intervalId = window.setInterval(async () => {
       try {
-        const convData = await fetchPrivateActivityConversations(currentActivityId);
-        if (isMounted) setConversations(convData);
+        const [convData, actorIds] = await Promise.all([
+          fetchPrivateActivityConversations(currentActivityId),
+          fetchUnreadPrivateMessageActorIds(currentActivityId),
+        ]);
+        if (isMounted) {
+          setConversations(convData);
+          setUnreadPrivateActorIds(new Set(actorIds));
+        }
       } catch { /* silent */ }
     }, 10000);
 
@@ -110,12 +118,7 @@ export default function PrivateConversationsPage() {
           if (!userId) return null;
 
           const senderId = getSenderId(conv);
-          const isUnseen = senderId !== currentUserId;
-
-          // Registrar que el organizador ha visto esta conversación
-          if (currentUserId && isUnseen) {
-            markPrivateChatSeen(currentActivityId, senderId ?? userId, currentUserId);
-          }
+          const isUnseen = Boolean(senderId && unreadPrivateActorIds.has(senderId));
 
           return (
             <article

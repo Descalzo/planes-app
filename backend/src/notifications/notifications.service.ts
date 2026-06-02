@@ -54,6 +54,29 @@ export class NotificationsService {
     });
   }
 
+  async getUnreadMessageActivityIds(userId: string) {
+    const activityIds = await this.notificationModel.distinct('activity', {
+      recipient: new Types.ObjectId(userId),
+      readAt: { $exists: false },
+      type: 'general_chat_message',
+      activity: { $exists: true, $ne: null },
+    });
+
+    return activityIds.map((activityId) => activityId.toString());
+  }
+
+  async getUnreadPrivateMessageActorIds(activityId: string, userId: string) {
+    const actorIds = await this.notificationModel.distinct('actor', {
+      recipient: new Types.ObjectId(userId),
+      activity: new Types.ObjectId(activityId),
+      readAt: { $exists: false },
+      type: 'private_activity_message',
+      actor: { $exists: true, $ne: null },
+    });
+
+    return actorIds.map((actorId) => actorId.toString());
+  }
+
   async markMessagesReadByActivity(activityId: string, userId: string) {
     await this.notificationModel.updateMany(
       {

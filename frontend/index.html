@@ -7,9 +7,13 @@
     <script>
       (function () {
         try {
-          var s = localStorage.getItem('planes-theme');
-          var t = s === 'dark' || s === 'light' ? s
-            : window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          var pref = localStorage.getItem('planes-theme-pref');
+          var t;
+          if (pref === 'dark' || pref === 'light') {
+            t = pref;
+          } else {
+            t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
           document.documentElement.setAttribute('data-theme', t);
         } catch (e) {}
       })();

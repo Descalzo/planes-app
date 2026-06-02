@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   fetchNotifications,
   InternalNotification,
+  markMessagesReadByActivity,
   markNotificationAsRead,
 } from '../services/internalNotificationService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
@@ -110,7 +111,7 @@ export default function MessagesPage() {
     setError(null);
 
     try {
-      await markNotificationAsRead(notification._id);
+      await markMessagesReadByActivity(activityId);
       markMessageNotificationSeenLocally(notification, activityId, currentUserId);
       setNotifications((current) => current.filter((n) => n._id !== notification._id));
       window.dispatchEvent(new Event('planes:messages-changed'));

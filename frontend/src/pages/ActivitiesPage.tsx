@@ -1,23 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ActivityCard from '../components/ActivityCard';
 import {
   Activity,
   ActivitySort,
-  ActivityStatusFilter,
   fetchActivities,
   fetchSavedActivities,
   saveActivity,
   unsaveActivity,
   getActivityParticipantsCount,
   isActivityCreator,
-  isActivitySavedByUser,
   isUserRemovedFromActivity,
   isUserInActivity,
 } from '../services/activityService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
-import { fetchMessages } from '../services/messageService';
-import { hasActivityUpdates, hasUnreadMessages } from '../services/notificationService';
+import { fetchUnreadMessageActivityIds } from '../services/internalNotificationService';
+import { hasActivityUpdates } from '../services/notificationService';
 import { CATEGORIES, CATEGORY_VISUALS } from '../utils/activityImages';
 import { PROVINCIAS } from '../utils/provincias';
 
@@ -38,12 +36,6 @@ function SkeletonActivityCard() {
   );
 }
 
-const STATUS_OPTIONS: { value: ActivityStatusFilter; label: string }[] = [
-  { value: 'futuras', label: 'Proximas' },
-  { value: 'pasadas', label: 'Pasadas' },
-  { value: 'todas', label: 'Todas' },
-];
-
 const SORT_OPTIONS: { value: ActivitySort; label: string }[] = [
   { value: 'fechaAsc', label: 'Mas cercanas en fecha' },
   { value: 'createdDesc', label: 'Ultimas creadas' },
@@ -56,7 +48,7 @@ export default function ActivitiesPage() {
   const [unreadMessageActivityIds, setUnreadMessageActivityIds] = useState<Set<string>>(new Set());
   const [selectedCategory, setSelectedCategory] = useState('');
   const [zonaPrincipalFilter, setZonaPrincipalFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState<ActivityStatusFilter>('futuras');
+  const [mostrarFinalizadas, setMostrarFinalizadas] = useState(false);
   const [sort, setSort] = useState<ActivitySort>('fechaAsc');
   const [savedActivityIds, setSavedActivityIds] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
@@ -73,7 +65,7 @@ export default function ActivitiesPage() {
           fetchActivities({
             categoria: selectedCategory,
             zonaPrincipal: zonaPrincipalFilter || undefined,
-            estado: statusFilter,
+            estado: mostrarFinalizadas ? 'todas' : 'futuras',
             sort,
           }),
           fetchCurrentUser(),
@@ -108,7 +100,7 @@ export default function ActivitiesPage() {
       isMounted = false;
       window.clearInterval(intervalId);
     };
-  }, [selectedCategory, zonaPrincipalFilter, statusFilter, sort]);
+  }, [selectedCategory, zonaPrincipalFilter, mostrarFinalizadas, sort]);
 
   const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
 
@@ -132,20 +124,44 @@ export default function ActivitiesPage() {
       });
     }
   }
+  const chipsRef = useRef<HTMLDivElement>(null);
+  const chipsDragStart = useRef({ x: 0, scrollLeft: 0, active: false });
+  const [chipsIsDragging, setChipsIsDragging] = useState(false);
+
+  function handleChipsWheel(e: React.WheelEvent<HTMLDivElement>) {
+    if (!chipsRef.current) return;
+    e.preventDefault();
+    chipsRef.current.scrollLeft += e.deltaY !== 0 ? e.deltaY : e.deltaX;
+  }
+
+  function handleChipsMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+    if (!chipsRef.current) return;
+    chipsDragStart.current = { x: e.clientX, scrollLeft: chipsRef.current.scrollLeft, active: true };
+  }
+
+  function handleChipsMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+    if (!chipsDragStart.current.active || !chipsRef.current) return;
+    const dx = e.clientX - chipsDragStart.current.x;
+    if (!chipsIsDragging && Math.abs(dx) > 4) setChipsIsDragging(true);
+    chipsRef.current.scrollLeft = chipsDragStart.current.scrollLeft - dx;
+  }
+
+  function handleChipsMouseUp() {
+    chipsDragStart.current.active = false;
+    setChipsIsDragging(false);
+  }
+
   const sectionTitle = selectedCategory || zonaPrincipalFilter
     ? 'Resultados filtrados'
-    : statusFilter === 'pasadas'
-      ? 'Actividades pasadas'
-      : statusFilter === 'todas'
-        ? 'Todas las actividades'
-        : 'Proximas actividades';
+    : mostrarFinalizadas ? 'Todas las actividades' : 'Proximas actividades';
   const emptyMessage = selectedCategory || zonaPrincipalFilter
     ? 'No hay actividades que coincidan con los filtros seleccionados.'
-    : statusFilter === 'pasadas'
-      ? 'No hay actividades pasadas.'
-      : 'No hay actividades proximas todavia.';
-  const activeFiltersCount = [zonaPrincipalFilter, statusFilter !== 'futuras' ? statusFilter : '', sort !== 'fechaAsc' ? sort : '']
-    .filter(Boolean).length;
+    : mostrarFinalizadas ? 'No hay actividades.' : 'No hay actividades proximas todavia.';
+  const activeFiltersCount = [
+    zonaPrincipalFilter,
+    mostrarFinalizadas ? 'finalizadas' : '',
+    sort !== 'fechaAsc' ? sort : '',
+  ].filter(Boolean).length;
 
   useEffect(() => {
     if (!currentUserId || activities.length === 0) {
@@ -154,30 +170,33 @@ export default function ActivitiesPage() {
     }
 
     let isMounted = true;
-    const joinedActivities = activities.filter((activity) => isUserInActivity(activity, currentUserId));
+    const visibleActivityIds = new Set(
+      activities
+        .filter((activity) => isUserInActivity(activity, currentUserId) || isActivityCreator(activity, currentUserId))
+        .map((activity) => activity._id),
+    );
 
     async function loadUnreadMessages() {
-      const activityIds = await Promise.all(
-        joinedActivities.map(async (activity) => {
-          try {
-            const messages = await fetchMessages(activity._id);
-            return hasUnreadMessages(activity._id, messages, currentUserId) ? activity._id : null;
-          } catch {
-            return null;
-          }
-        }),
-      );
-      if (isMounted) {
-        setUnreadMessageActivityIds(new Set(activityIds.filter(Boolean) as string[]));
+      try {
+        const activityIds = await fetchUnreadMessageActivityIds();
+        if (isMounted) {
+          setUnreadMessageActivityIds(new Set(activityIds.filter((id) => visibleActivityIds.has(id))));
+        }
+      } catch {
+        if (isMounted) {
+          setUnreadMessageActivityIds(new Set());
+        }
       }
     }
 
     loadUnreadMessages();
     const intervalId = window.setInterval(loadUnreadMessages, 5000);
+    window.addEventListener('planes:messages-changed', loadUnreadMessages);
 
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
+      window.removeEventListener('planes:messages-changed', loadUnreadMessages);
     };
   }, [activities, currentUserId]);
 
@@ -193,7 +212,17 @@ export default function ActivitiesPage() {
         </div>
       </header>
 
-      <div className="category-chips" role="group" aria-label="Filtrar por categoria">
+      <div
+        className={`category-chips${chipsIsDragging ? ' category-chips--dragging' : ''}`}
+        role="group"
+        aria-label="Filtrar por categoria"
+        ref={chipsRef}
+        onWheel={handleChipsWheel}
+        onMouseDown={handleChipsMouseDown}
+        onMouseMove={handleChipsMouseMove}
+        onMouseUp={handleChipsMouseUp}
+        onMouseLeave={handleChipsMouseUp}
+      >
         <button
           type="button"
           className={`category-chips__chip${selectedCategory === '' ? ' category-chips__chip--active' : ''}`}
@@ -247,17 +276,6 @@ export default function ActivitiesPage() {
                   </select>
                 </label>
                 <label>
-                  Estado
-                  <select
-                    value={statusFilter}
-                    onChange={(event) => setStatusFilter(event.target.value as ActivityStatusFilter)}
-                  >
-                    {STATUS_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
                   Ordenar por
                   <select value={sort} onChange={(event) => setSort(event.target.value as ActivitySort)}>
                     {SORT_OPTIONS.map((option) => (
@@ -265,6 +283,18 @@ export default function ActivitiesPage() {
                     ))}
                   </select>
                 </label>
+                <div className="activity-filters__toggle">
+                  <span className="activity-filters__toggle-text">Mostrar finalizadas</span>
+                  <button
+                    className={`toggle-switch${mostrarFinalizadas ? ' toggle-switch--on' : ''}`}
+                    type="button"
+                    role="switch"
+                    aria-checked={mostrarFinalizadas}
+                    onClick={() => setMostrarFinalizadas((v) => !v)}
+                  >
+                    <span className="toggle-switch__thumb" />
+                  </button>
+                </div>
               </div>
             )}
           </>
@@ -304,6 +334,7 @@ export default function ActivitiesPage() {
                 hasActivityUpdates={hasCreatorUpdates}
                 hasUnreadMessages={unreadMessageActivityIds.has(activity._id)}
                 leftUsersCount={hasCreatorUpdates ? activity.salidas?.length ?? 0 : 0}
+                estado={activity.estado}
                 isSaved={savedActivityIds.has(activity._id)}
                 onToggleSave={currentUserId ? () => handleToggleSave(activity._id) : undefined}
               />

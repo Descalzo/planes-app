@@ -10,6 +10,7 @@ export interface Activity {
   ciudad?: string;
   zonaPrincipal?: string;
   fecha?: string;
+  estado?: 'activa' | 'finalizada';
   plazas?: number;
   plazasOcupadas?: number;
   plazasDisponibles?: number;

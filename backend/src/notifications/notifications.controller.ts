@@ -27,6 +27,24 @@ export class NotificationsController {
     return this.notificationsService.getUnreadMessagesCount(user.id).then((count) => ({ count }));
   }
 
+  @Get('unread-message-activity-ids')
+  getUnreadMessageActivityIds(@CurrentUser() user: { id: string }) {
+    return this.notificationsService
+      .getUnreadMessageActivityIds(user.id)
+      .then((activityIds) => ({ activityIds }));
+  }
+
+  @Get('unread-private-message-actor-ids/:activityId')
+  @ApiParam({ name: 'activityId', description: 'ID de la actividad', type: String })
+  getUnreadPrivateMessageActorIds(
+    @Param('activityId', ParseObjectIdPipe) activityId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.notificationsService
+      .getUnreadPrivateMessageActorIds(activityId, user.id)
+      .then((actorIds) => ({ actorIds }));
+  }
+
   @Patch('status/mark-all-read')
   markAllStatusRead(@CurrentUser() user: { id: string }) {
     return this.notificationsService.markAllStatusRead(user.id).then(() => ({ ok: true }));
@@ -50,4 +68,3 @@ export class NotificationsController {
     return this.notificationsService.markAsRead(id, user.id);
   }
 }
-

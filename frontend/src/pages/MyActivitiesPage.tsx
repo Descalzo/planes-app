@@ -15,8 +15,8 @@ import {
   isUserRejectedFromActivity,
 } from '../services/activityService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
-import { fetchMessages } from '../services/messageService';
-import { hasActivityUpdates, hasUnreadMessages } from '../services/notificationService';
+import { fetchUnreadMessageActivityIds } from '../services/internalNotificationService';
+import { hasActivityUpdates } from '../services/notificationService';
 
 type View = 'creadas' | 'unidas' | 'solicitadas' | 'meGustan';
 
@@ -110,6 +110,14 @@ export default function MyActivitiesPage() {
     return createdActivities;
   }, [createdActivities, joinedActivities, requestedActivities, savedActivities, currentUserId, view]);
 
+  const { proximasActivities, pasadasActivities } = useMemo(() => {
+    const ahora = Date.now();
+    return {
+      proximasActivities: visibleActivities.filter((a) => !a.fecha || new Date(a.fecha).getTime() >= ahora),
+      pasadasActivities: visibleActivities.filter((a) => a.fecha && new Date(a.fecha).getTime() < ahora),
+    };
+  }, [visibleActivities]);
+
   useEffect(() => {
     if (!currentUserId || chatActivities.length === 0) {
       setUnreadMessageActivityIds(new Set());
@@ -117,20 +125,18 @@ export default function MyActivitiesPage() {
     }
 
     let isMounted = true;
+    const visibleChatActivityIds = new Set(chatActivities.map((activity) => activity._id));
 
     async function loadUnreadMessages() {
-      const activityIds = await Promise.all(
-        chatActivities.map(async (activity) => {
-          try {
-            const messages = await fetchMessages(activity._id);
-            return hasUnreadMessages(activity._id, messages, currentUserId) ? activity._id : null;
-          } catch {
-            return null;
-          }
-        }),
-      );
-      if (isMounted) {
-        setUnreadMessageActivityIds(new Set(activityIds.filter(Boolean) as string[]));
+      try {
+        const activityIds = await fetchUnreadMessageActivityIds();
+        if (isMounted) {
+          setUnreadMessageActivityIds(new Set(activityIds.filter((id) => visibleChatActivityIds.has(id))));
+        }
+      } catch {
+        if (isMounted) {
+          setUnreadMessageActivityIds(new Set());
+        }
       }
     }
 
@@ -213,8 +219,8 @@ export default function MyActivitiesPage() {
         {!isLoading && !error && visibleActivities.length === 0 && (
           <p>{emptyMessages[view]}</p>
         )}
-        <div className="activity-grid">
-          {visibleActivities.map((activity) => {
+        {!isLoading && !error && visibleActivities.length > 0 && (() => {
+          const renderCard = (activity: Activity) => {
             const hasCreatorUpdates = Boolean(
               currentUserId &&
               isActivityCreator(activity, currentUserId) &&
@@ -226,7 +232,6 @@ export default function MyActivitiesPage() {
                 : currentUserId && isUserRejectedFromActivity(activity, currentUserId)
                   ? 'rejected'
                   : undefined;
-
             return (
               <ActivityCard
                 key={activity._id}
@@ -235,6 +240,7 @@ export default function MyActivitiesPage() {
                 category={activity.categoria}
                 city={activity.ciudad}
                 zonaPrincipal={activity.zonaPrincipal}
+                estado={activity.estado}
                 date={activity.fecha}
                 spots={activity.plazas}
                 occupiedSpots={activity.plazasOcupadas}
@@ -252,8 +258,30 @@ export default function MyActivitiesPage() {
                 onToggleSave={currentUserId ? () => handleToggleSave(activity._id) : undefined}
               />
             );
-          })}
-        </div>
+          };
+          return (
+            <>
+              {proximasActivities.length > 0 && (
+                <>
+                  {pasadasActivities.length > 0 && (
+                    <p className="activities-group__label">Próximas</p>
+                  )}
+                  <div className="activity-grid">
+                    {proximasActivities.map(renderCard)}
+                  </div>
+                </>
+              )}
+              {pasadasActivities.length > 0 && (
+                <>
+                  <p className="activities-group__label">Pasadas</p>
+                  <div className="activity-grid">
+                    {pasadasActivities.map(renderCard)}
+                  </div>
+                </>
+              )}
+            </>
+          );
+        })()}
       </section>
     </main>
   );

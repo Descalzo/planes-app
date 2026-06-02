@@ -9,6 +9,7 @@ interface ActivityCardProps {
   category?: string;
   city?: string;
   zonaPrincipal?: string;
+  estado?: 'activa' | 'finalizada';
   date?: string;
   spots?: number;
   occupiedSpots?: number;
@@ -33,6 +34,7 @@ export default function ActivityCard({
   category,
   city,
   zonaPrincipal,
+  estado,
   date,
   spots,
   occupiedSpots,
@@ -114,15 +116,20 @@ export default function ActivityCard({
       <div className="activity-card__content">
         <div className="activity-card__topline">
           <p className="activity-card__meta">{[category, zonaPrincipal || city].filter(Boolean).join(' · ') || 'Sin categoria'}</p>
-          {isCreator
-            ? <span className="activity-card__badge activity-card__badge--creator">Creada por ti</span>
-            : requestStatus === 'pending'
-              ? <span className="activity-card__badge">Solicitud pendiente</span>
-              : requestStatus === 'rejected'
-                ? <span className="activity-card__badge activity-card__badge--removed">Solicitud rechazada</span>
-                : isJoined && <span className="activity-card__badge">Ya unido</span>
-          }
-          {isRemoved && <span className="activity-card__badge activity-card__badge--removed">Te han quitado</span>}
+          <div className="activity-card__badges">
+            {estado === 'finalizada' && (
+              <span className="activity-card__badge activity-card__badge--done">Finalizada</span>
+            )}
+            {isCreator
+              ? <span className="activity-card__badge activity-card__badge--creator">Creada por ti</span>
+              : requestStatus === 'pending'
+                ? <span className="activity-card__badge">Solicitud pendiente</span>
+                : requestStatus === 'rejected'
+                  ? <span className="activity-card__badge activity-card__badge--removed">Solicitud rechazada</span>
+                  : isJoined && <span className="activity-card__badge">Ya unido</span>
+            }
+            {isRemoved && <span className="activity-card__badge activity-card__badge--removed">Te han quitado</span>}
+          </div>
         </div>
         {(requestStatus || isRemoved || hasActivityUpdates || hasUnreadMessages || leftUsersCount > 0) && (
           <div className="activity-card__notices">

@@ -163,17 +163,15 @@ export default function Navigation() {
             <img className="topbar__brand-icon" src="/logo-app.png" alt="" aria-hidden="true" />
             <span>Planes</span>
           </Link>
+          {hasToken && (
+            <Link className="topbar__fab" to="/activities/new" aria-label="Crear actividad">
+              <span className="topbar__fab-label">Crear actividad</span>
+              <span className="topbar__fab-circle"><PlusIcon /></span>
+            </Link>
+          )}
           <div className="topbar__links">
             {hasToken ? (
               <>
-                <Link
-                  className="topbar__icon-link topbar__create-link"
-                  to="/activities/new"
-                  title="Crear actividad"
-                  aria-label="Crear actividad"
-                >
-                  <PlusIcon />
-                </Link>
                 <Link
                   className="topbar__icon-link"
                   to="/messages"
@@ -229,13 +227,13 @@ export default function Navigation() {
 
       {hasToken && !isChatPage && (
         <nav className="bottom-nav" aria-label="Navegacion tabs">
-          <NavLink className={navItemClass} to="/activities">
-            <span className="bottom-nav__item-icon"><ExploreIcon /></span>
-            <span>Explorar</span>
-          </NavLink>
           <NavLink className={navItemClass} to="/my-activities">
             <span className="bottom-nav__item-icon"><MyPlansIcon /></span>
             <span>Mis planes</span>
+          </NavLink>
+          <NavLink className={navItemClass} to="/activities">
+            <span className="bottom-nav__item-icon"><ExploreIcon /></span>
+            <span>Explorar</span>
           </NavLink>
           <NavLink className={navItemClass} to="/profile">
             <span className="bottom-nav__item-icon"><ProfileIcon /></span>

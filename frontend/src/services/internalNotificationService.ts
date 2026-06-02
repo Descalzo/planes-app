@@ -39,6 +39,16 @@ export async function fetchUnreadMessagesCount() {
   return response.data.count;
 }
 
+export async function fetchUnreadMessageActivityIds() {
+  const response = await api.get<{ activityIds: string[] }>('/notifications/unread-message-activity-ids');
+  return response.data.activityIds;
+}
+
+export async function fetchUnreadPrivateMessageActorIds(activityId: string) {
+  const response = await api.get<{ actorIds: string[] }>(`/notifications/unread-private-message-actor-ids/${activityId}`);
+  return response.data.actorIds;
+}
+
 export async function markMessagesReadByActivity(activityId: string) {
   await api.patch(`/notifications/messages/read-by-activity/${activityId}`, {});
 }
