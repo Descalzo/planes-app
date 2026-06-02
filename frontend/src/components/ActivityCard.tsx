@@ -34,10 +34,12 @@ interface ActivityCardProps {
   isJoined?: boolean;
   isCreator?: boolean;
   isRemoved?: boolean;
+  requestStatus?: 'pending' | 'rejected';
   hasActivityUpdates?: boolean;
   hasUnreadMessages?: boolean;
   leftUsersCount?: number;
   isSaved?: boolean;
+  privateChatUserId?: string;
   onToggleSave?: () => void;
 }
 
@@ -55,10 +57,12 @@ export default function ActivityCard({
   isJoined = false,
   isCreator = false,
   isRemoved = false,
+  requestStatus,
   hasActivityUpdates = false,
   hasUnreadMessages = false,
   leftUsersCount = 0,
   isSaved = false,
+  privateChatUserId,
   onToggleSave,
 }: ActivityCardProps) {
   const totalSpots = typeof spots === 'number' ? spots : 10;
@@ -120,12 +124,18 @@ export default function ActivityCard({
           <p className="activity-card__meta">{[category, city].filter(Boolean).join(' · ') || 'Sin categoria'}</p>
           {isCreator
             ? <span className="activity-card__badge activity-card__badge--creator">Creada por ti</span>
-            : isJoined && <span className="activity-card__badge">Ya unido</span>
+            : requestStatus === 'pending'
+              ? <span className="activity-card__badge">Solicitud pendiente</span>
+              : requestStatus === 'rejected'
+                ? <span className="activity-card__badge activity-card__badge--removed">Solicitud rechazada</span>
+                : isJoined && <span className="activity-card__badge">Ya unido</span>
           }
           {isRemoved && <span className="activity-card__badge activity-card__badge--removed">Te han quitado</span>}
         </div>
-        {(isRemoved || hasActivityUpdates || hasUnreadMessages || leftUsersCount > 0) && (
+        {(requestStatus || isRemoved || hasActivityUpdates || hasUnreadMessages || leftUsersCount > 0) && (
           <div className="activity-card__notices">
+            {requestStatus === 'pending' && <span>Solicitud pendiente de aprobacion</span>}
+            {requestStatus === 'rejected' && <span>Solicitud rechazada</span>}
             {isRemoved && <span>Ya no formas parte de esta actividad</span>}
             {leftUsersCount > 0 && <span>{leftUsersCount} se desapuntaron</span>}
             {hasActivityUpdates && <Link className="activity-card__notice-link" to={`/activities/${id}`}>Novedades en tu actividad</Link>}
@@ -145,6 +155,11 @@ export default function ActivityCard({
         <Link className="button button--secondary" to={`/activities/${id}`}>
           Ver actividad
         </Link>
+        {privateChatUserId && (
+          <Link className="button button--ghost" to={`/activities/${id}/private-chat/${privateChatUserId}`}>
+            Preguntar al organizador
+          </Link>
+        )}
       </div>
     </article>
   );

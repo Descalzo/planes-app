@@ -36,6 +36,14 @@ export class UsersController {
     return this.usersService.findById(user.id);
   }
 
+  @Get('me/requested-activities')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Obtener actividades solicitadas pendientes o rechazadas del usuario autenticado' })
+  async getRequestedActivities(@CurrentUser() user: { id: string }) {
+    return this.usersService.getRequestedActivities(user.id);
+  }
+
   @Patch('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT')

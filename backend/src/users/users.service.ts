@@ -82,6 +82,21 @@ export class UsersService {
     return updatedUser.toObject();
   }
 
+  async getRequestedActivities(userId: string): Promise<any[]> {
+    const userObjectId = new Types.ObjectId(userId);
+    const activities = await this.activityModel
+      .find({
+        $or: [
+          { solicitudesPendientes: userObjectId },
+          { solicitudesRechazadas: userObjectId },
+        ],
+        participantes: { $ne: userObjectId },
+      })
+      .exec();
+
+    return this.hydrateActivities(this.sortActivitiesByDateAsc(activities));
+  }
+
   async login(loginUserDto: LoginUserDto): Promise<{ user: Omit<User, 'password'>; id: string }> {
     const user = await this.userModel.findOne({ email: loginUserDto.email });
 
@@ -144,6 +159,97 @@ export class UsersService {
       perfilCompleto,
       logros,
     };
+  }
+
+  private sortActivitiesByDateAsc(activities: any[]) {
+    return [...activities].sort((a, b) => {
+      const aTime = a.fecha ? new Date(a.fecha).getTime() : Number.POSITIVE_INFINITY;
+      const bTime = b.fecha ? new Date(b.fecha).getTime() : Number.POSITIVE_INFINITY;
+
+      if (aTime !== bTime) {
+        return aTime - bTime;
+      }
+
+      const aCreatedAt = a.get('createdAt') ? new Date(a.get('createdAt')).getTime() : 0;
+      const bCreatedAt = b.get('createdAt') ? new Date(b.get('createdAt')).getTime() : 0;
+      return bCreatedAt - aCreatedAt;
+    });
+  }
+
+  private getValidObjectId(value: unknown) {
+    const id = value?.toString();
+    return id && Types.ObjectId.isValid(id) ? id : null;
+  }
+
+  private hydrateUserReferences(
+    references: unknown[] | undefined,
+    usersById: Map<string, unknown>,
+  ) {
+    return (references ?? [])
+      .map((reference) => {
+        const referenceId = this.getValidObjectId(reference);
+        return referenceId ? usersById.get(referenceId) ?? referenceId : null;
+      })
+      .filter(Boolean);
+  }
+
+  private getPlazasTotales(activity: any) {
+    return typeof activity.plazas === 'number' && activity.plazas > 0 ? activity.plazas : 10;
+  }
+
+  private getPlazasOcupadas(activity: any) {
+    return new Set((activity.participantes ?? []).map((participant: Types.ObjectId) => participant.toString())).size;
+  }
+
+  private async hydrateActivities(activities: any[]) {
+    const userIds = new Set<string>();
+
+    activities.forEach((activity) => {
+      const creatorId = this.getValidObjectId(activity.creador);
+      if (creatorId) {
+        userIds.add(creatorId);
+      }
+
+      [
+        ...(activity.participantes ?? []),
+        ...(activity.solicitudesPendientes ?? []),
+        ...(activity.solicitudesRechazadas ?? []),
+        ...(activity.expulsados ?? []),
+        ...(activity.salidas ?? []),
+        ...(activity.chatSilenciados ?? []),
+      ].forEach((reference) => {
+        const referenceId = this.getValidObjectId(reference);
+        if (referenceId) {
+          userIds.add(referenceId);
+        }
+      });
+    });
+
+    const users = await this.userModel
+      .find({ _id: { $in: [...userIds].map((id) => new Types.ObjectId(id)) } })
+      .select('nombre email ciudad')
+      .lean()
+      .exec();
+    const usersById = new Map(users.map((user) => [user._id.toString(), user]));
+
+    return activities.map((activity) => {
+      const plainActivity = activity.toObject();
+      const creatorId = this.getValidObjectId(activity.creador);
+
+      return {
+        ...plainActivity,
+        plazas: this.getPlazasTotales(activity),
+        plazasOcupadas: this.getPlazasOcupadas(activity),
+        plazasDisponibles: Math.max(this.getPlazasTotales(activity) - this.getPlazasOcupadas(activity), 0),
+        creador: creatorId ? usersById.get(creatorId) ?? creatorId : plainActivity.creador,
+        participantes: this.hydrateUserReferences(activity.participantes, usersById),
+        solicitudesPendientes: this.hydrateUserReferences(activity.solicitudesPendientes, usersById),
+        solicitudesRechazadas: this.hydrateUserReferences(activity.solicitudesRechazadas, usersById),
+        expulsados: this.hydrateUserReferences(activity.expulsados, usersById),
+        salidas: this.hydrateUserReferences(activity.salidas, usersById),
+        chatSilenciados: this.hydrateUserReferences(activity.chatSilenciados, usersById),
+      };
+    });
   }
 
   private async buildPublicProfileResponse(user: UserDocument) {

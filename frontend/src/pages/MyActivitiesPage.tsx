@@ -4,34 +4,37 @@ import ActivityCard from '../components/ActivityCard';
 import {
   Activity,
   fetchActivities,
+  fetchRequestedActivities,
   fetchSavedActivities,
   saveActivity,
   unsaveActivity,
   getActivityParticipantsCount,
   isActivityCreator,
-  isUserRemovedFromActivity,
   isUserInActivity,
+  isUserPendingInActivity,
+  isUserRejectedFromActivity,
 } from '../services/activityService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
 import { fetchMessages } from '../services/messageService';
 import { hasActivityUpdates, hasUnreadMessages } from '../services/notificationService';
 
-type View = 'todas' | 'creadas' | 'unidas' | 'meGustan';
+type View = 'creadas' | 'unidas' | 'solicitadas' | 'meGustan';
 
 const VIEW_LABELS: Record<View, string> = {
-  todas:    'Todas',
-  creadas:  'Creadas por mí',
-  unidas:   'A las que me uní',
+  creadas: 'Creadas por mi',
+  unidas: 'Me he unido',
+  solicitadas: 'Solicitadas',
   meGustan: 'Me gustan',
 };
 
 export default function MyActivitiesPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [requestedActivities, setRequestedActivities] = useState<Activity[]>([]);
   const [savedActivities, setSavedActivities] = useState<Activity[]>([]);
   const [savedActivityIds, setSavedActivityIds] = useState<Set<string>>(new Set());
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [unreadMessageActivityIds, setUnreadMessageActivityIds] = useState<Set<string>>(new Set());
-  const [view, setView] = useState<View>('todas');
+  const [view, setView] = useState<View>('creadas');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,13 +44,15 @@ export default function MyActivitiesPage() {
 
     async function loadPageData() {
       try {
-        const [activitiesData, userData, savedData] = await Promise.all([
+        const [activitiesData, requestedData, userData, savedData] = await Promise.all([
           fetchActivities({ estado: 'todas', sort: 'fechaAsc' }),
+          fetchRequestedActivities().catch(() => [] as Activity[]),
           fetchCurrentUser(),
           fetchSavedActivities().catch(() => [] as Activity[]),
         ]);
         if (isMounted) {
           setActivities(activitiesData);
+          setRequestedActivities(requestedData);
           setCurrentUser(userData);
           setSavedActivities(savedData);
           setSavedActivityIds(new Set(savedData.map((a) => a._id)));
@@ -78,26 +83,35 @@ export default function MyActivitiesPage() {
 
   const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
 
-  const myActivities = useMemo(
+  const createdActivities = useMemo(
+    () => (currentUserId ? activities.filter((a) => isActivityCreator(a, currentUserId)) : []),
+    [activities, currentUserId],
+  );
+
+  const joinedActivities = useMemo(
     () =>
       currentUserId
-        ? activities.filter(
-            (a) => isUserInActivity(a, currentUserId) || isUserRemovedFromActivity(a, currentUserId),
-          )
+        ? activities.filter((a) => isUserInActivity(a, currentUserId) && !isActivityCreator(a, currentUserId))
         : [],
     [activities, currentUserId],
   );
 
+  const chatActivities = useMemo(
+    () => [...createdActivities, ...joinedActivities],
+    [createdActivities, joinedActivities],
+  );
+
   const visibleActivities = useMemo(() => {
     if (!currentUserId) return [];
-    if (view === 'creadas')  return myActivities.filter((a) => isActivityCreator(a, currentUserId));
-    if (view === 'unidas')   return myActivities.filter((a) => !isActivityCreator(a, currentUserId));
+    if (view === 'creadas') return createdActivities;
+    if (view === 'unidas') return joinedActivities;
+    if (view === 'solicitadas') return requestedActivities;
     if (view === 'meGustan') return savedActivities;
-    return myActivities;
-  }, [myActivities, savedActivities, currentUserId, view]);
+    return createdActivities;
+  }, [createdActivities, joinedActivities, requestedActivities, savedActivities, currentUserId, view]);
 
   useEffect(() => {
-    if (!currentUserId || myActivities.length === 0) {
+    if (!currentUserId || chatActivities.length === 0) {
       setUnreadMessageActivityIds(new Set());
       return;
     }
@@ -106,7 +120,7 @@ export default function MyActivitiesPage() {
 
     async function loadUnreadMessages() {
       const activityIds = await Promise.all(
-        myActivities.map(async (activity) => {
+        chatActivities.map(async (activity) => {
           try {
             const messages = await fetchMessages(activity._id);
             return hasUnreadMessages(activity._id, messages, currentUserId) ? activity._id : null;
@@ -127,7 +141,7 @@ export default function MyActivitiesPage() {
       isMounted = false;
       window.clearInterval(intervalId);
     };
-  }, [myActivities, currentUserId]);
+  }, [chatActivities, currentUserId]);
 
   async function handleToggleSave(activityId: string) {
     const isSaved = savedActivityIds.has(activityId);
@@ -154,9 +168,9 @@ export default function MyActivitiesPage() {
   }
 
   const emptyMessages: Record<View, string> = {
-    todas:    'No tienes actividades creadas ni a las que te hayas unido.',
-    creadas:  'No has creado ninguna actividad todavia.',
-    unidas:   'No te has unido a ninguna actividad todavia.',
+    creadas: 'No has creado ninguna actividad todavia.',
+    unidas: 'No te has unido a ninguna actividad todavia.',
+    solicitadas: 'No tienes solicitudes pendientes ni rechazadas.',
     meGustan: 'No has marcado ninguna actividad como me gusta todavia.',
   };
 
@@ -165,7 +179,7 @@ export default function MyActivitiesPage() {
       <header>
         <div>
           <h1>Mis actividades</h1>
-          <p>Planes que has creado o a los que te has unido.</p>
+          <p>Planes que has creado, solicitado, guardado o a los que te has unido.</p>
         </div>
         <div className="page-actions">
           <Link className="button button--secondary" to="/activities">Explorar</Link>
@@ -203,8 +217,14 @@ export default function MyActivitiesPage() {
             const hasCreatorUpdates = Boolean(
               currentUserId &&
               isActivityCreator(activity, currentUserId) &&
-              hasActivityUpdates(activity, currentUserId)
+              hasActivityUpdates(activity, currentUserId),
             );
+            const requestStatus =
+              currentUserId && isUserPendingInActivity(activity, currentUserId)
+                ? 'pending'
+                : currentUserId && isUserRejectedFromActivity(activity, currentUserId)
+                  ? 'rejected'
+                  : undefined;
 
             return (
               <ActivityCard
@@ -221,11 +241,12 @@ export default function MyActivitiesPage() {
                 participants={getActivityParticipantsCount(activity, currentUserId)}
                 isJoined={Boolean(currentUserId && isUserInActivity(activity, currentUserId))}
                 isCreator={Boolean(currentUserId && isActivityCreator(activity, currentUserId))}
-                isRemoved={Boolean(currentUserId && isUserRemovedFromActivity(activity, currentUserId))}
+                requestStatus={requestStatus}
                 hasActivityUpdates={hasCreatorUpdates}
                 hasUnreadMessages={unreadMessageActivityIds.has(activity._id)}
                 leftUsersCount={hasCreatorUpdates ? activity.salidas?.length ?? 0 : 0}
                 isSaved={savedActivityIds.has(activity._id)}
+                privateChatUserId={requestStatus && currentUserId ? currentUserId : undefined}
                 onToggleSave={currentUserId ? () => handleToggleSave(activity._id) : undefined}
               />
             );

@@ -131,6 +131,11 @@ export async function fetchSavedActivities() {
   return response.data;
 }
 
+export async function fetchRequestedActivities() {
+  const response = await api.get<Activity[]>('/users/me/requested-activities');
+  return response.data;
+}
+
 export function isActivitySavedByUser(activity: Activity, userId: string | null | undefined) {
   if (!userId || !activity.guardadoPor) return false;
   return activity.guardadoPor.some((id) => {
