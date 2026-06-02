@@ -28,7 +28,14 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.png', 'icon.svg'],
+      includeAssets: [
+        'favicon.png',
+        'logo-app.png',
+        'pwa-192x192.png',
+        'pwa-512x512.png',
+        'pwa-maskable-192x192.png',
+        'pwa-maskable-512x512.png',
+      ],
       manifest: {
         name: 'Planes',
         short_name: 'Planes',

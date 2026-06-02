@@ -1,5 +1,6 @@
 import { ChangeEvent, useEffect, useState } from 'react';
 import { uploadImage } from '../services/uploadService';
+import { compressImageForUpload, ImageCompressionError } from '../utils/imageCompression';
 
 interface ImageUploadFieldProps {
   id: string;
@@ -12,10 +13,20 @@ interface ImageUploadFieldProps {
 }
 
 function getUploadErrorMessage(error: unknown) {
+  if (error instanceof ImageCompressionError) {
+    return error.message;
+  }
+
   if (typeof error === 'object' && error && 'response' in error) {
-    const response = (error as { response?: { data?: { message?: string | string[] } } }).response;
+    const response = (error as { response?: { status?: number; data?: { message?: string | string[] } } }).response;
     const message = response?.data?.message;
-    return Array.isArray(message) ? message.join(', ') : message ?? 'No se pudo subir la imagen';
+    const normalizedMessage = Array.isArray(message) ? message.join(', ') : message;
+
+    if (response?.status === 413 || normalizedMessage?.toLowerCase().includes('too large')) {
+      return 'La imagen sigue siendo demasiado grande. Prueba con otra foto.';
+    }
+
+    return normalizedMessage ?? 'No se pudo subir la imagen';
   }
 
   return 'No se pudo subir la imagen';
@@ -58,7 +69,16 @@ export default function ImageUploadField({
     setIsUploading(true);
     onUploadingChange?.(true);
     try {
-      const uploaded = await uploadImage(file);
+      const imageToUpload = await compressImageForUpload(file);
+      const compressedPreviewUrl = URL.createObjectURL(imageToUpload);
+      setLocalPreview((currentPreview) => {
+        if (currentPreview) {
+          URL.revokeObjectURL(currentPreview);
+        }
+        return compressedPreviewUrl;
+      });
+
+      const uploaded = await uploadImage(imageToUpload);
       onChange(uploaded.url);
       setLocalPreview((currentPreview) => {
         if (currentPreview) {
@@ -81,7 +101,7 @@ export default function ImageUploadField({
     <div className="image-upload-field">
       <label htmlFor={id}>{label}</label>
       <input id={id} type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={handleFileChange} />
-      <span className="field-hint">JPG, PNG, WEBP o GIF. Maximo 5 MB.</span>
+      <span className="field-hint">JPG, PNG, WEBP o GIF. Se optimiza antes de subir; maximo 5 MB.</span>
 
       {previewUrl && (
         <div className="image-preview">
