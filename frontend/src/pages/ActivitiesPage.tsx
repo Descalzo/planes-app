@@ -18,7 +18,24 @@ import {
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
 import { fetchMessages } from '../services/messageService';
 import { hasActivityUpdates, hasUnreadMessages } from '../services/notificationService';
-import { CATEGORIES } from '../utils/activityImages';
+import { CATEGORIES, CATEGORY_VISUALS } from '../utils/activityImages';
+
+function SkeletonActivityCard() {
+  return (
+    <div className="activity-card">
+      <div className="skeleton skeleton-card__image" />
+      <div style={{ display: 'grid', gap: '0.5rem', padding: '0.85rem 1rem' }}>
+        <div className="skeleton" style={{ height: '0.7rem', width: '38%', borderRadius: '4px' }} />
+        <div className="skeleton" style={{ height: '1.1rem', width: '78%', borderRadius: '4px' }} />
+        <div className="skeleton" style={{ height: '0.82rem', width: '52%', borderRadius: '4px' }} />
+        <div className="skeleton" style={{ height: '0.82rem', width: '42%', borderRadius: '4px' }} />
+      </div>
+      <div className="activity-card__footer">
+        <div className="skeleton" style={{ height: '2.4rem', borderRadius: '999px' }} />
+      </div>
+    </div>
+  );
+}
 
 const STATUS_OPTIONS: { value: ActivityStatusFilter; label: string }[] = [
   { value: 'futuras', label: 'Proximas' },
@@ -126,7 +143,7 @@ export default function ActivitiesPage() {
     : statusFilter === 'pasadas'
       ? 'No hay actividades pasadas.'
       : 'No hay actividades proximas todavia.';
-  const activeFiltersCount = [selectedCategory, cityFilter.trim(), statusFilter !== 'futuras' ? statusFilter : '', sort !== 'fechaAsc' ? sort : '']
+  const activeFiltersCount = [cityFilter.trim(), statusFilter !== 'futuras' ? statusFilter : '', sort !== 'fechaAsc' ? sort : '']
     .filter(Boolean).length;
 
   useEffect(() => {
@@ -171,12 +188,37 @@ export default function ActivitiesPage() {
           <p>Explora las actividades disponibles y unete a las que mas te interesen.</p>
         </div>
         <div className="page-actions">
-          <Link className="button button--secondary" to="/my-activities">Mis actividades</Link>
           <Link className="button button--primary" to="/activities/new">Crear actividad</Link>
         </div>
       </header>
+
+      <div className="category-chips" role="group" aria-label="Filtrar por categoria">
+        <button
+          type="button"
+          className={`category-chips__chip${selectedCategory === '' ? ' category-chips__chip--active' : ''}`}
+          onClick={() => setSelectedCategory('')}
+        >
+          Todas
+        </button>
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat}
+            type="button"
+            className={`category-chips__chip${selectedCategory === cat ? ' category-chips__chip--active' : ''}`}
+            onClick={() => setSelectedCategory(cat)}
+          >
+            <span aria-hidden="true">{CATEGORY_VISUALS[cat]?.emoji}</span>
+            {cat}
+          </button>
+        ))}
+      </div>
+
       <section className="activities-stack">
-        {isLoading && <p>Cargando actividades...</p>}
+        {isLoading && (
+          <div className="activity-grid">
+            {[0, 1, 2, 3, 4, 5].map((i) => <SkeletonActivityCard key={i} />)}
+          </div>
+        )}
         {error && <p role="alert">{error}</p>}
         {!isLoading && !error && (
           <>
@@ -196,15 +238,6 @@ export default function ActivitiesPage() {
             </div>
             {showFilters && (
               <div className="activity-filters">
-                <label>
-                  Categoria
-                  <select value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)}>
-                    <option value="">Todas</option>
-                    {CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </label>
                 <label>
                   Ciudad
                   <input
@@ -238,7 +271,11 @@ export default function ActivitiesPage() {
           </>
         )}
         {!isLoading && !error && activities.length === 0 && (
-          <p>{emptyMessage}</p>
+          <div className="empty-state">
+            <div className="empty-state__icon">🔍</div>
+            <p className="empty-state__title">Sin resultados</p>
+            <p className="empty-state__body">{emptyMessage}</p>
+          </div>
         )}
         <div className="activity-grid">
           {activities.map((activity) => {

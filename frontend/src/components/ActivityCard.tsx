@@ -71,6 +71,12 @@ export default function ActivityCard({
 
   return (
     <article className={cardClassName}>
+      <Link
+        className="activity-card__link-overlay"
+        to={`/activities/${id}`}
+        aria-hidden="true"
+        tabIndex={-1}
+      />
       <div className="activity-card__media">
         {!imgError ? (
           <img
@@ -128,23 +134,25 @@ export default function ActivityCard({
         )}
         <h2>{title}</h2>
         <p className="activity-card__date">{formattedDate}</p>
-        <p className="activity-card__spots">
-          {usedSpots}/{totalSpots} plazas ·{' '}
-          <span className={isFull ? 'activity-card__spots-status activity-card__spots-status--full' : 'activity-card__spots-status activity-card__spots-status--available'}>
-            {isFull ? 'Completa' : `Quedan ${freeSpots} plazas`}
+        <div className="activity-card__spots">
+          <div className="activity-card__spots-bar">
+            <div
+              className={`activity-card__spots-fill${isFull ? ' activity-card__spots-fill--full' : ''}`}
+              style={{ width: `${Math.min((usedSpots / totalSpots) * 100, 100)}%` }}
+            />
+          </div>
+          <span className="activity-card__spots-label">
+            {isFull ? 'Completo · Sin plazas' : `${freeSpots} de ${totalSpots} plazas libres`}
           </span>
-        </p>
+        </div>
       </div>
-      <div className="activity-card__footer">
-        <Link className="button button--secondary" to={`/activities/${id}`}>
-          Ver actividad
-        </Link>
-        {privateChatUserId && (
+      {privateChatUserId && (
+        <div className="activity-card__footer">
           <Link className="button button--ghost" to={`/activities/${id}/private-chat/${privateChatUserId}`}>
             Preguntar al organizador
           </Link>
-        )}
-      </div>
+        </div>
+      )}
     </article>
   );
 }

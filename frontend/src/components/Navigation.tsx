@@ -213,15 +213,15 @@ export default function Navigation() {
       {hasToken && !isChatPage && (
         <nav className="bottom-nav" aria-label="Navegacion tabs">
           <NavLink className={navItemClass} to="/activities">
-            <ExploreIcon />
+            <span className="bottom-nav__item-icon"><ExploreIcon /></span>
             <span>Explorar</span>
           </NavLink>
           <NavLink className={navItemClass} to="/my-activities">
-            <MyPlansIcon />
+            <span className="bottom-nav__item-icon"><MyPlansIcon /></span>
             <span>Mis planes</span>
           </NavLink>
           <NavLink className={navItemClass} to="/profile">
-            <ProfileIcon />
+            <span className="bottom-nav__item-icon"><ProfileIcon /></span>
             <span>Perfil</span>
           </NavLink>
         </nav>

@@ -116,10 +116,27 @@ export default function NotificationsPage() {
       </header>
 
       <section className="notifications-list">
-        {isLoading && <p>Cargando notificaciones...</p>}
+        {isLoading && (
+          <>
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                style={{ display: 'grid', gap: '0.5rem', padding: '1rem 1rem 1rem 1.35rem', borderRadius: 'var(--r-lg)', background: 'var(--surface)', border: '1px solid var(--border)' }}
+              >
+                <div className="skeleton" style={{ height: '0.875rem', width: '65%', borderRadius: '4px' }} />
+                <div className="skeleton" style={{ height: '0.75rem', width: '40%', borderRadius: '4px' }} />
+                <div className="skeleton" style={{ height: '2.1rem', width: '8rem', borderRadius: '999px', marginTop: '0.25rem' }} />
+              </div>
+            ))}
+          </>
+        )}
         {error && <p role="alert">{error}</p>}
         {!isLoading && !error && notifications.length === 0 && (
-          <p>No tienes notificaciones todavia.</p>
+          <div className="empty-state">
+            <div className="empty-state__icon">🔔</div>
+            <p className="empty-state__title">Todo al dia</p>
+            <p className="empty-state__body">Cuando alguien solicite unirse a tu actividad o haya novedades, aparecera aqui.</p>
+          </div>
         )}
         {notifications.map((notification) => {
           const activityId = getActivityId(notification);
