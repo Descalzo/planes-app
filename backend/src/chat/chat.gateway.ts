@@ -161,7 +161,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const room = this.privateRoomName(activityId, senderId, recvId);
       this.server.to(room).emit('newPrivateMessage', message);
-      return { ok: true };
+      return { ok: true, message };
     } catch (error: any) {
       throw new WsException(error?.message ?? 'No se pudo enviar el mensaje');
     }

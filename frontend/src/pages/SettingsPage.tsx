@@ -137,6 +137,13 @@ export default function SettingsPage() {
           </div>
           <span className="settings-item__chevron">›</span>
         </Link>
+        <Link className="settings-item settings-item--link" to="/settings/activity-history">
+          <div>
+            <p className="settings-item__label">Historial de actividades</p>
+            <p className="settings-item__hint">Actividades ya realizadas</p>
+          </div>
+          <span className="settings-item__chevron">›</span>
+        </Link>
         <button
           className="settings-item settings-item--link settings-item--danger"
           type="button"

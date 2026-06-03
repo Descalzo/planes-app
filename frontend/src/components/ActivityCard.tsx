@@ -62,31 +62,28 @@ export default function ActivityCard({
         timeStyle: 'short',
       }).format(new Date(date))
     : 'Fecha por definir';
-  const cardClassName = isRemoved
-    ? 'activity-card activity-card--removed'
-    : isJoined
-      ? 'activity-card activity-card--joined'
-      : 'activity-card';
+  const cardClassName = [
+    'activity-card',
+    isRemoved ? 'activity-card--removed' : '',
+    isJoined && !isRemoved ? 'activity-card--joined' : '',
+    estado === 'finalizada' ? 'activity-card--finished' : '',
+  ].filter(Boolean).join(' ');
 
   const visual = getCategoryVisual(category);
   const [imgError, setImgError] = useState(false);
-  const imageUrl = getActivityImage(imagenUrl, category);
+  const imageUrl = getOptimizedActivityImage(getActivityImage(imagenUrl, category), Boolean(imagenUrl?.trim()));
   const isDefaultImage = !imagenUrl?.trim();
 
   return (
     <article className={cardClassName}>
-      <Link
-        className="activity-card__link-overlay"
-        to={`/activities/${id}`}
-        aria-hidden="true"
-        tabIndex={-1}
-      />
       <div className="activity-card__media">
         {!imgError ? (
           <img
             className={`activity-card__image${isDefaultImage ? ' activity-card__image--default' : ''}`}
             src={imageUrl}
             alt={title}
+            loading="lazy"
+            decoding="async"
             onError={() => setImgError(true)}
           />
         ) : (
@@ -141,7 +138,7 @@ export default function ActivityCard({
             {hasUnreadMessages && <Link className="activity-card__notice-link" to={`/activities/${id}/chat`}>Mensajes nuevos</Link>}
           </div>
         )}
-        <h2>{title}</h2>
+        <h2><Link className="activity-card__title-link" to={`/activities/${id}`}>{title}</Link></h2>
         <p className="activity-card__date">{formattedDate}</p>
         <div className="activity-card__spots">
           <div className="activity-card__spots-bar">
@@ -164,4 +161,12 @@ export default function ActivityCard({
       )}
     </article>
   );
+}
+
+function getOptimizedActivityImage(url: string, isUploadedImage: boolean) {
+  if (!isUploadedImage || !url.includes('/upload/')) {
+    return url;
+  }
+
+  return url.replace('/upload/', '/upload/f_auto,q_auto,w_640,c_limit/');
 }

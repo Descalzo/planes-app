@@ -24,12 +24,16 @@ import {
   unsaveActivity,
 } from '../services/activityService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
-import { fetchUnreadPrivateMessageActorIds } from '../services/internalNotificationService';
+import {
+  fetchUnreadPrivateMessageActorIds,
+  markStatusNotificationsReadByActivity,
+} from '../services/internalNotificationService';
 import { markActivitySeen } from '../services/notificationService';
 import {
   fetchPrivateActivityConversations,
   PrivateActivityConversation,
 } from '../services/privateActivityChatService';
+import { hasActivityStarted, isActivityArchived } from '../utils/activityLifecycle';
 import { getCategoryVisual, getActivityImage } from '../utils/activityImages';
 import SaveMarkerIcon from '../components/SaveMarkerIcon';
 
@@ -83,6 +87,8 @@ export default function ActivityDetailPage() {
           setCurrentUser(userData);
           viewerId = userData._id ?? userData.id ?? null;
           markActivitySeen(activityData._id, viewerId);
+          markStatusNotificationsReadByActivity(activityData._id).catch(() => {});
+          window.dispatchEvent(new Event('planes:notifications-changed'));
           setIsSaved(isActivitySavedByUser(activityData, viewerId));
           setError(null);
         }
@@ -297,6 +303,9 @@ export default function ActivityDetailPage() {
   const isPending = Boolean(activity && currentUserId && isUserPendingInActivity(activity, currentUserId));
   const isRejected = Boolean(activity && currentUserId && isUserRejectedFromActivity(activity, currentUserId));
   const isRemoved = Boolean(activity && currentUserId && isUserRemovedFromActivity(activity, currentUserId));
+  const hasStarted = Boolean(activity && hasActivityStarted(activity));
+  const isArchived = Boolean(activity && isActivityArchived(activity));
+  const canUseChat = !isArchived;
   const creatorId = activity ? getReferenceId(activity.creador) : null;
   const visibleParticipants = activity
     ? (activity.participantes ?? []).filter((participant, index, allParticipants) => {
@@ -329,7 +338,7 @@ export default function ActivityDetailPage() {
     <main className="page page--detail">
       <header>
         <h1>{activity?.titulo ?? 'Detalle de actividad'}</h1>
-        {activity && currentUserId && (
+        {activity && currentUserId && !hasStarted && (
           <button
             className={`activity-card__save-btn detail-save-btn${isSaved ? ' activity-card__save-btn--saved' : ''}`}
             type="button"
@@ -348,9 +357,10 @@ export default function ActivityDetailPage() {
             {(() => {
               const visual = getCategoryVisual(activity.categoria);
               const imageUrl = getActivityImage(activity.imagenUrl, activity.categoria);
+              const isDefaultImage = !activity.imagenUrl?.trim();
               return !detailImgError ? (
                 <img
-                  className="detail-card__image"
+                  className={`detail-card__image${isDefaultImage ? ' detail-card__image--default' : ''}`}
                   src={imageUrl}
                   alt={activity.titulo}
                   onError={() => setDetailImgError(true)}
@@ -367,13 +377,9 @@ export default function ActivityDetailPage() {
             })()}
             <p className="detail-card__description">{activity.descripcion || 'Sin descripcion'}</p>
             <div className="detail-grid">
-              <p><span>Categoria</span>{activity.categoria || 'Sin categoria'}</p>
-              {activity.zonaPrincipal && <p><span>Provincia</span>{activity.zonaPrincipal}</p>}
-              {activity.ciudad && <p><span>Lugar</span>{activity.ciudad}</p>}
-              {activity.fecha && <p><span>Fecha</span>{new Date(activity.fecha).toLocaleString()}</p>}
-              <p><span>Participantes aceptados</span>{acceptedParticipants}</p>
-              <p><span>Plazas totales</span>{totalSpots}</p>
-              <p><span>Plazas disponibles</span>{isFull ? 'Completa' : availableSpots}</p>
+              <p><span>Categoria / lugar</span>{[activity.categoria || 'Sin categoria', activity.zonaPrincipal || activity.ciudad].filter(Boolean).join(' · ')}</p>
+              <p><span>Fecha / participantes</span>{activity.fecha ? new Date(activity.fecha).toLocaleString() : 'Fecha por definir'} · {acceptedParticipants} aceptados</p>
+              <p><span>Plazas</span>{isFull ? 'Completa' : `${availableSpots} libres`} · {totalSpots} totales</p>
             </div>
             <div className="creator-info">
               <h3>Organizador</h3>
@@ -393,51 +399,55 @@ export default function ActivityDetailPage() {
             </div>
             {isCreator && (
               <div className="participants-panel">
-                <h2>Solicitudes pendientes</h2>
-                {pendingRequests.length === 0 ? (
-                  <p>No hay solicitudes pendientes.</p>
-                ) : (
-                  <div className="participants-list">
-                    {pendingRequests.map((user) => {
-                      const userId = getReferenceId(user);
-                      if (!userId) {
-                        return null;
-                      }
+                {!hasStarted && (
+                  <>
+                    <h2>Solicitudes pendientes</h2>
+                    {pendingRequests.length === 0 ? (
+                      <p>No hay solicitudes pendientes.</p>
+                    ) : (
+                      <div className="participants-list">
+                        {pendingRequests.map((user) => {
+                          const userId = getReferenceId(user);
+                          if (!userId) {
+                            return null;
+                          }
 
-                      return (
-                        <div className="participant-row" key={userId}>
-                          <div>
-                            <strong>{getReferenceName(user)}</strong>
-                            <span> Pendiente</span>
-                          </div>
-                          <div className="participant-actions">
-                            <Link
-                              className="button button--ghost button--small"
-                              to={`/users/${userId}/profile?activityId=${activityId}`}
-                            >
-                              Ver perfil
-                            </Link>
-                            <button
-                              className="button button--secondary button--small"
-                              type="button"
-                              disabled={requestActionId === userId || isFull}
-                              onClick={() => handleAcceptRequest(userId)}
-                            >
-                              {requestActionId === userId ? 'Guardando...' : isFull ? 'Completa' : 'Aceptar'}
-                            </button>
-                            <button
-                              className="button button--ghost button--small"
-                              type="button"
-                              disabled={requestActionId === userId}
-                              onClick={() => handleRejectRequest(userId)}
-                            >
-                              Rechazar
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                          return (
+                            <div className="participant-row" key={userId}>
+                              <div>
+                                <strong>{getReferenceName(user)}</strong>
+                                <span> Pendiente</span>
+                              </div>
+                              <div className="participant-actions participant-actions--review">
+                                <Link
+                                  className="button button--ghost button--small"
+                                  to={`/users/${userId}/profile?activityId=${activityId}`}
+                                >
+                                  Ver perfil
+                                </Link>
+                                <button
+                                  className="button button--secondary button--small"
+                                  type="button"
+                                  disabled={requestActionId === userId || isFull}
+                                  onClick={() => handleAcceptRequest(userId)}
+                                >
+                                  {requestActionId === userId ? 'Guardando...' : isFull ? 'Completa' : 'Aceptar'}
+                                </button>
+                                <button
+                                  className="button button--ghost button--small"
+                                  type="button"
+                                  disabled={requestActionId === userId}
+                                  onClick={() => handleRejectRequest(userId)}
+                                >
+                                  Rechazar
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
                 )}
                 <h2>Participantes</h2>
                 <div className="participants-list">
@@ -467,29 +477,32 @@ export default function ActivityDetailPage() {
                                 Ver perfil
                               </Link>
                             )}
-                            {!isCurrentCreator && (
-                              <>
-                                <button
-                                  className="button button--ghost button--small"
-                                  type="button"
-                                  disabled={mutingParticipantId === participantId}
-                                  onClick={() => handleToggleMute(participantId, isMuted)}
-                                >
-                                  {mutingParticipantId === participantId
-                                    ? 'Guardando...'
-                                    : isMuted
-                                      ? 'Permitir hablar'
-                                      : 'Silenciar chat'}
-                                </button>
-                                <button
-                                  className="button button--ghost button--small"
-                                  type="button"
-                                  disabled={removingParticipantId === participantId}
-                                  onClick={() => handleRemoveParticipant(participantId)}
-                                >
-                                  {removingParticipantId === participantId ? 'Quitando...' : 'Quitar'}
-                                </button>
-                              </>
+                            {!isArchived && !isCurrentCreator && (
+                              <details className="participant-more">
+                                <summary className="button button--ghost button--small">Mas</summary>
+                                <div className="participant-more__menu">
+                                  <button
+                                    className="button button--ghost button--small"
+                                    type="button"
+                                    disabled={mutingParticipantId === participantId}
+                                    onClick={() => handleToggleMute(participantId, isMuted)}
+                                  >
+                                    {mutingParticipantId === participantId
+                                      ? 'Guardando...'
+                                      : isMuted
+                                        ? 'Permitir hablar'
+                                        : 'Silenciar chat'}
+                                  </button>
+                                  <button
+                                    className="button button--ghost button--small"
+                                    type="button"
+                                    disabled={removingParticipantId === participantId}
+                                    onClick={() => handleRemoveParticipant(participantId)}
+                                  >
+                                    {removingParticipantId === participantId ? 'Quitando...' : 'Quitar'}
+                                  </button>
+                                </div>
+                              </details>
                             )}
                           </div>
                         </div>
@@ -534,14 +547,16 @@ export default function ActivityDetailPage() {
                               <strong>{getReferenceName(user)}</strong>
                               <span> No puede escribir en el chat</span>
                             </div>
-                            <button
-                              className="button button--ghost button--small"
-                              type="button"
-                              disabled={mutingParticipantId === userId}
-                              onClick={() => handleToggleMute(userId, true)}
-                            >
-                              {mutingParticipantId === userId ? 'Guardando...' : 'Permitir hablar'}
-                            </button>
+                            {!isArchived && (
+                              <button
+                                className="button button--ghost button--small"
+                                type="button"
+                                disabled={mutingParticipantId === userId}
+                                onClick={() => handleToggleMute(userId, true)}
+                              >
+                                {mutingParticipantId === userId ? 'Guardando...' : 'Permitir hablar'}
+                              </button>
+                            )}
                           </div>
                         );
                       })}
@@ -564,14 +579,16 @@ export default function ActivityDetailPage() {
                               <strong>{getReferenceName(user)}</strong>
                               <span> No puede volver a unirse</span>
                             </div>
-                            <button
-                              className="button button--ghost button--small"
-                              type="button"
-                              disabled={unbanningParticipantId === userId}
-                              onClick={() => handleUnban(userId)}
-                            >
-                              {unbanningParticipantId === userId ? 'Desbaneando...' : 'Desbanear'}
-                            </button>
+                            {!isArchived && (
+                              <button
+                                className="button button--ghost button--small"
+                                type="button"
+                                disabled={unbanningParticipantId === userId}
+                                onClick={() => handleUnban(userId)}
+                              >
+                                {unbanningParticipantId === userId ? 'Desbaneando...' : 'Desbanear'}
+                              </button>
+                            )}
                           </div>
                         );
                       })}
@@ -612,7 +629,11 @@ export default function ActivityDetailPage() {
               </div>
             )}
             <div className="detail-actions">
-              {isRemoved ? (
+              {isArchived ? (
+                <p className="status-pill">Actividad finalizada</p>
+              ) : hasStarted ? (
+                <p className="status-pill">Actividad realizada - chat disponible durante 24 horas</p>
+              ) : isRemoved ? (
                 <p className="status-pill status-pill--danger">Te han quitado de esta actividad</p>
               ) : isPending ? (
                 <>
@@ -641,7 +662,7 @@ export default function ActivityDetailPage() {
                 </>
               ) : isJoined ? (
                 <>
-                  <p className="status-pill">{isCreator ? 'Eres el organizador' : 'Ya participas'}</p>
+                <p className="status-pill">{isCreator ? 'Eres el organizador' : 'Ya participas'}</p>
                   {!isCreator && (
                     <button className="button button--ghost" type="button" onClick={handleLeave} disabled={isLeaving}>
                       {isLeaving ? 'Saliendo...' : 'Desapuntarme'}
@@ -674,14 +695,14 @@ export default function ActivityDetailPage() {
                   )}
                 </>
               )}
-              {isCreator && activityId && (
-                <Link className="button button--ghost" to={`/activities/${activityId}/edit`}>
+              {!hasStarted && isCreator && activityId && (
+                <Link className="button button--primary detail-actions__primary" to={`/activities/${activityId}/edit`}>
                   Editar
                 </Link>
               )}
-              {isCreator && activityId && (
+              {!hasStarted && isCreator && activityId && (
                 <Link
-                  className={`button button--ghost${unreadPrivateActorIds.size > 0 ? ' button--has-badge' : ''}`}
+                  className={`button button--ghost detail-actions__secondary${unreadPrivateActorIds.size > 0 ? ' button--has-badge' : ''}`}
                   to={`/activities/${activityId}/conversations`}
                 >
                   {unreadPrivateActorIds.size > 0 && (
@@ -690,8 +711,8 @@ export default function ActivityDetailPage() {
                   Consultas privadas{privateConversations.length > 0 ? ` (${privateConversations.length})` : ''}
                 </Link>
               )}
-              {activityId && (isCreator || isJoined) && (
-                <Link className="button button--secondary" to={`/activities/${activityId}/chat`}>
+              {canUseChat && activityId && (isCreator || isJoined) && (
+                <Link className="button button--secondary detail-actions__primary" to={`/activities/${activityId}/chat`}>
                   Ir al chat
                 </Link>
               )}

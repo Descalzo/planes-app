@@ -19,8 +19,8 @@ export interface InternalNotification {
   updatedAt?: string;
 }
 
-export async function fetchNotifications() {
-  const response = await api.get<InternalNotification[]>('/notifications');
+export async function fetchNotifications(limit = 30) {
+  const response = await api.get<InternalNotification[]>('/notifications', { params: { limit } });
   return response.data;
 }
 
@@ -44,6 +44,22 @@ export async function fetchUnreadMessageActivityIds() {
   return response.data.activityIds;
 }
 
+export async function fetchUnreadStatusActivityIds() {
+  const notifications = await fetchNotifications(100);
+  const activityIds = notifications
+    .filter((notification) => !notification.readAt)
+    .filter((notification) => notification.type !== 'private_activity_message' && notification.type !== 'general_chat_message')
+    .map((notification) => {
+      if (!notification.activity) return null;
+      return typeof notification.activity === 'string'
+        ? notification.activity
+        : notification.activity._id ?? notification.activity.id ?? null;
+    })
+    .filter((activityId): activityId is string => Boolean(activityId));
+
+  return [...new Set(activityIds)];
+}
+
 export async function fetchUnreadPrivateMessageActorIds(activityId: string) {
   const response = await api.get<{ actorIds: string[] }>(`/notifications/unread-private-message-actor-ids/${activityId}`);
   return response.data.actorIds;
@@ -55,4 +71,8 @@ export async function markMessagesReadByActivity(activityId: string) {
 
 export async function markAllStatusRead() {
   await api.patch('/notifications/status/mark-all-read', {});
+}
+
+export async function markStatusNotificationsReadByActivity(activityId: string) {
+  await api.patch(`/notifications/status/read-by-activity/${activityId}`, {});
 }

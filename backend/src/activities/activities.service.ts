@@ -16,6 +16,7 @@ interface FindAllActivitiesOptions {
   zonaPrincipal?: string;
   estado?: string;
   sort?: string;
+  limit?: string;
 }
 
 @Injectable()
@@ -110,6 +111,15 @@ export class ActivitiesService {
     return sort === 'createdDesc' || sort === 'createdAsc' ? sort : 'fechaAsc';
   }
 
+  private getLimit(limit?: string) {
+    const parsed = Number(limit);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return 60;
+    }
+
+    return Math.min(Math.floor(parsed), 120);
+  }
+
   private sortActivitiesByDateAsc(activities: ActivityDocument[]) {
     return [...activities].sort((a, b) => {
       const aTime = a.fecha ? new Date(a.fecha).getTime() : Number.POSITIVE_INFINITY;
@@ -189,6 +199,7 @@ export class ActivitiesService {
     const now = new Date();
     const status = this.getStatusFilter(options.estado);
     const sort = this.getSort(options.sort);
+    const limit = this.getLimit(options.limit);
     const categoria = options.categoria?.trim();
     const ciudad = options.ciudad?.trim();
     const zonaPrincipal = options.zonaPrincipal?.trim();
@@ -225,9 +236,11 @@ export class ActivitiesService {
       query = query.sort({ createdAt: -1 });
     } else if (sort === 'createdAsc') {
       query = query.sort({ createdAt: 1 });
+    } else {
+      query = query.sort({ fecha: 1, createdAt: -1 });
     }
 
-    const activities = await query.exec();
+    const activities = await query.limit(limit).exec();
     return this.hydrateActivities(sort === 'fechaAsc' ? this.sortActivitiesByDateAsc(activities) : activities);
   }
 

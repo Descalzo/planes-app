@@ -12,13 +12,13 @@ function apiOnly(req: { headers: Record<string, string | string[] | undefined> }
 }
 
 const backendProxy = {
-  target: 'http://localhost:3000',
+  target: 'http://127.0.0.1:3000',
   changeOrigin: true,
   bypass: apiOnly,
 };
 
 const wsProxy = {
-  target: 'http://localhost:3000',
+  target: 'http://127.0.0.1:3000',
   changeOrigin: true,
   ws: true,
 };

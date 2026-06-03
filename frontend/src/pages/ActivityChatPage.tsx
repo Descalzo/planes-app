@@ -8,6 +8,7 @@ import { fetchMessages, Message, markGeneralChatActive } from '../services/messa
 import { markMessagesReadByActivity } from '../services/internalNotificationService';
 import { markChatSeen, markChatSeenNow } from '../services/notificationService';
 import { getSocket } from '../services/socketService';
+import { isActivityArchived } from '../utils/activityLifecycle';
 
 export default function ActivityChatPage() {
   const navigate = useNavigate();
@@ -27,6 +28,8 @@ export default function ActivityChatPage() {
     currentUserId &&
     (isActivityCreator(activity, currentUserId) || isUserInActivity(activity, currentUserId)),
   );
+  const isArchived = Boolean(activity && isActivityArchived(activity));
+  const canWriteChat = canAccessChat && !isArchived;
 
   // Initial load: activity, user, messages via HTTP
   useEffect(() => {
@@ -66,7 +69,7 @@ export default function ActivityChatPage() {
 
   // Mark notifications as read + keep active ping (suppresses push notifications)
   useEffect(() => {
-    if (!currentActivityId) return;
+    if (!currentActivityId || !canWriteChat) return;
     markMessagesReadByActivity(currentActivityId).catch(() => {});
     markChatSeenNow(currentActivityId, currentUserId);
     window.dispatchEvent(new Event('planes:messages-changed'));
@@ -78,11 +81,11 @@ export default function ActivityChatPage() {
     pingActive();
     const intervalId = window.setInterval(pingActive, 8000);
     return () => { isMounted = false; window.clearInterval(intervalId); };
-  }, [currentActivityId, currentUserId]);
+  }, [currentActivityId, currentUserId, canWriteChat]);
 
   // WebSocket setup — runs after access is confirmed
   useEffect(() => {
-    if (!currentActivityId || !canAccessChat) return;
+    if (!currentActivityId || !canWriteChat) return;
 
     const socket = getSocket();
 
@@ -117,7 +120,7 @@ export default function ActivityChatPage() {
       socket.off('disconnect');
       setSocketConnected(false);
     };
-  }, [currentActivityId, canAccessChat, currentUserId]);
+  }, [currentActivityId, canWriteChat, currentUserId]);
 
   async function handleSend(text: string) {
     const socket = getSocket();
@@ -159,10 +162,16 @@ export default function ActivityChatPage() {
             currentUserId={currentUserId}
             messages={messages}
           />
-          <MessageInput
-            activityId={currentActivityId}
-            onSend={socketConnected ? handleSend : undefined}
-          />
+          {canWriteChat ? (
+            <MessageInput
+              activityId={currentActivityId}
+              onSend={socketConnected ? handleSend : undefined}
+            />
+          ) : (
+            <div className="message-input message-input--readonly">
+              <p>Chat cerrado: la actividad ya esta archivada.</p>
+            </div>
+          )}
         </>
       )}
     </main>

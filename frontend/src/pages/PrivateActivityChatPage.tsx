@@ -17,6 +17,7 @@ import {
 import { markMessagesReadByActivity } from '../services/internalNotificationService';
 import { markPrivateChatSeen } from '../services/notificationService';
 import { getSocket } from '../services/socketService';
+import { isActivityArchived } from '../utils/activityLifecycle';
 
 function getErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
@@ -27,6 +28,15 @@ function getErrorMessage(error: unknown) {
   }
 
   return 'No se pudo completar la accion';
+}
+
+function SendIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
+  );
 }
 
 export default function PrivateActivityChatPage() {
@@ -46,6 +56,8 @@ export default function PrivateActivityChatPage() {
   const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
   const conversationUserId = userId ?? currentUserId ?? '';
   const isCreator = Boolean(activity && currentUserId && isActivityCreator(activity, currentUserId));
+  const isArchived = Boolean(activity && isActivityArchived(activity));
+  const canWriteChat = !isArchived;
 
   useEffect(() => {
     if (!currentActivityId || !conversationUserId) {
@@ -97,7 +109,7 @@ export default function PrivateActivityChatPage() {
   }, [currentActivityId]);
 
   useEffect(() => {
-    if (!currentActivityId || !conversationUserId) return;
+    if (!currentActivityId || !conversationUserId || !canWriteChat) return;
 
     let isMounted = true;
 
@@ -116,15 +128,27 @@ export default function PrivateActivityChatPage() {
       isMounted = false;
       window.clearInterval(intervalId);
     };
-  }, [currentActivityId, conversationUserId]);
+  }, [currentActivityId, conversationUserId, canWriteChat]);
 
   // WebSocket: private chat real-time
   useEffect(() => {
-    if (!currentActivityId || !conversationUserId) return;
+    if (!currentActivityId || !conversationUserId || !canWriteChat) return;
 
     const socket = getSocket();
 
+    function belongsToCurrentConversation(message: PrivateActivityMessage) {
+      const senderId = getReferenceId(message.sender);
+      const receiverId = getReferenceId(message.receiver);
+      return (
+        message.activity === currentActivityId &&
+        Boolean(currentUserId) &&
+        ((senderId === currentUserId && receiverId === conversationUserId) ||
+          (senderId === conversationUserId && receiverId === currentUserId))
+      );
+    }
+
     function onNewPrivateMessage(message: PrivateActivityMessage) {
+      if (!belongsToCurrentConversation(message)) return;
       if (seenIds.current.has(message._id)) return;
       seenIds.current.add(message._id);
       setMessages((prev) => [...prev, message]);
@@ -148,7 +172,7 @@ export default function PrivateActivityChatPage() {
       socket.off('newPrivateMessage', onNewPrivateMessage);
       socket.off('connect', joinRoom);
     };
-  }, [currentActivityId, conversationUserId]);
+  }, [currentActivityId, conversationUserId, currentUserId, canWriteChat]);
 
   useEffect(() => {
     const messagesBox = messagesBoxRef.current;
@@ -159,22 +183,22 @@ export default function PrivateActivityChatPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedText = text.trim();
-    if (!trimmedText || !currentActivityId || !conversationUserId) return;
+    if (!trimmedText || !currentActivityId || !conversationUserId || !canWriteChat) return;
 
     setError(null);
     setIsSubmitting(true);
     try {
       const socket = getSocket();
-      let message: PrivateActivityMessage;
+      let message: PrivateActivityMessage | null = null;
 
       if (socket.connected) {
-        message = await new Promise<PrivateActivityMessage>((resolve, reject) => {
+        message = await new Promise<PrivateActivityMessage | null>((resolve, reject) => {
           socket.emit(
             'sendPrivateMessage',
             { activityId: currentActivityId, text: trimmedText, receiverId: isCreator ? conversationUserId : undefined },
-            (response: { ok?: boolean; error?: string }) => {
+            (response: { ok?: boolean; error?: string; message?: PrivateActivityMessage }) => {
               if (response?.error) reject(new Error(response.error));
-              else resolve(null as unknown as PrivateActivityMessage);
+              else resolve(response.message ?? null);
             },
           );
         });
@@ -185,10 +209,11 @@ export default function PrivateActivityChatPage() {
           trimmedText,
           isCreator ? conversationUserId : undefined,
         );
-        if (message && !seenIds.current.has(message._id)) {
-          seenIds.current.add(message._id);
-          setMessages((current) => [...current, message]);
-        }
+      }
+      if (message && !seenIds.current.has(message._id)) {
+        const sentMessage = message;
+        seenIds.current.add(sentMessage._id);
+        setMessages((current) => [...current, sentMessage]);
       }
       setText('');
     } catch (caughtError) {
@@ -224,14 +249,17 @@ export default function PrivateActivityChatPage() {
           <p>Sin mensajes todavia.</p>
         )}
         <div className="message-list__box">
-          {messages.map((message) => {
+          {messages.map((message, index) => {
             const isOwn = Boolean(currentUserId && getReferenceId(message.sender) === currentUserId);
+            const senderId = getReferenceId(message.sender);
+            const previousSenderId = index > 0 ? getReferenceId(messages[index - 1].sender) : null;
+            const showAuthor = !isOwn && senderId !== previousSenderId;
             return (
               <div
                 key={message._id}
-                className={`message-bubble ${isOwn ? 'message-bubble--own' : 'message-bubble--other'}`}
+                className={`message-bubble ${isOwn ? 'message-bubble--own' : 'message-bubble--other'}${showAuthor ? '' : ' message-bubble--stacked'}`}
               >
-                {!isOwn && <span className="message-bubble__author">{getReferenceName(message.sender)}</span>}
+                {showAuthor && <span className="message-bubble__author">{getReferenceName(message.sender)}</span>}
                 <p className="message-bubble__text">{message.text}</p>
               </div>
             );
@@ -239,23 +267,29 @@ export default function PrivateActivityChatPage() {
         </div>
       </section>
 
-      <form className="message-input" onSubmit={handleSubmit}>
-        <div className="message-input__body">
-          <textarea
-            value={text}
-            placeholder="Escribe un mensaje privado..."
-            onChange={(event) => setText(event.target.value)}
-          />
+      {canWriteChat ? (
+        <form className="message-input" onSubmit={handleSubmit}>
+          <div className="message-input__body">
+            <textarea
+              value={text}
+              placeholder="Escribe un mensaje privado..."
+              onChange={(event) => setText(event.target.value)}
+            />
+          </div>
+          <button
+            className="button button--primary message-input__send"
+            type="submit"
+            disabled={isSubmitting}
+            aria-label={isSubmitting ? 'Enviando' : 'Enviar mensaje'}
+          >
+            {isSubmitting ? '...' : <SendIcon />}
+          </button>
+        </form>
+      ) : (
+        <div className="message-input message-input--readonly">
+          <p>Chat cerrado: la actividad ya esta archivada.</p>
         </div>
-        <button
-          className="button button--primary message-input__send"
-          type="submit"
-          disabled={isSubmitting}
-          aria-label={isSubmitting ? 'Enviando' : 'Enviar mensaje'}
-        >
-          {isSubmitting ? '...' : 'Enviar'}
-        </button>
-      </form>
+      )}
     </main>
   );
 }

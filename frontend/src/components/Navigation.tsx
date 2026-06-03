@@ -29,15 +29,6 @@ function ProfileIcon() {
   );
 }
 
-function PlusIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19" />
-      <line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
-  );
-}
-
 function SettingsIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -82,7 +73,6 @@ export default function Navigation() {
   const navigate = useNavigate();
   const location = useLocation();
   const hasToken = Boolean(getAuthToken());
-  const isChatPage = /\/activities\/[^/]+\/(private-chat|chat)/.test(location.pathname);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
@@ -116,7 +106,7 @@ export default function Navigation() {
       window.clearInterval(intervalId);
       window.removeEventListener('planes:notifications-changed', loadUnreadCount);
     };
-  }, [hasToken, location.pathname]);
+  }, [hasToken]);
 
   useEffect(() => {
     if (!hasToken) {
@@ -148,7 +138,7 @@ export default function Navigation() {
       window.clearInterval(intervalId);
       window.removeEventListener('planes:messages-changed', loadUnreadMessagesCount);
     };
-  }, [hasToken, location.pathname]);
+  }, [hasToken]);
 
   function handleLogout() {
     setAuthToken(null);
@@ -166,15 +156,6 @@ export default function Navigation() {
           <div className="topbar__links">
             {hasToken ? (
               <>
-                <Link
-                  className="topbar__create-btn"
-                  to="/activities/new"
-                  title="Crear actividad"
-                  aria-label="Crear actividad"
-                >
-                  <PlusIcon />
-                  <span className="topbar__create-btn-label">Crear</span>
-                </Link>
                 <Link
                   className="topbar__icon-link"
                   to="/messages"
@@ -228,7 +209,7 @@ export default function Navigation() {
         </nav>
       </header>
 
-      {hasToken && !isChatPage && (
+      {hasToken && (
         <nav className="bottom-nav" aria-label="Navegacion tabs">
           <NavLink className={navItemClass} to="/my-activities">
             <span className="bottom-nav__item-icon"><MyPlansIcon /></span>

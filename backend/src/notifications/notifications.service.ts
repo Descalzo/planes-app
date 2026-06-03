@@ -29,10 +29,20 @@ export class NotificationsService {
     return notification.save();
   }
 
-  async findForUser(userId: string) {
+  private getLimit(limit?: string) {
+    const parsed = Number(limit);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return 30;
+    }
+
+    return Math.min(Math.floor(parsed), 100);
+  }
+
+  async findForUser(userId: string, limit?: string) {
     return this.notificationModel
       .find({ recipient: new Types.ObjectId(userId) })
       .sort({ createdAt: -1 })
+      .limit(this.getLimit(limit))
       .populate('actor', 'nombre email ciudad')
       .populate('activity', 'titulo ciudad fecha')
       .exec();
@@ -59,6 +69,17 @@ export class NotificationsService {
       recipient: new Types.ObjectId(userId),
       readAt: { $exists: false },
       type: 'general_chat_message',
+      activity: { $exists: true, $ne: null },
+    });
+
+    return activityIds.map((activityId) => activityId.toString());
+  }
+
+  async getUnreadStatusActivityIds(userId: string) {
+    const activityIds = await this.notificationModel.distinct('activity', {
+      recipient: new Types.ObjectId(userId),
+      readAt: { $exists: false },
+      type: { $nin: ['private_activity_message', 'general_chat_message'] },
       activity: { $exists: true, $ne: null },
     });
 
@@ -93,6 +114,18 @@ export class NotificationsService {
     await this.notificationModel.updateMany(
       {
         recipient: new Types.ObjectId(userId),
+        type: { $nin: ['private_activity_message', 'general_chat_message'] },
+        readAt: { $exists: false },
+      },
+      { $set: { readAt: new Date() } },
+    );
+  }
+
+  async markStatusReadByActivity(activityId: string, userId: string) {
+    await this.notificationModel.updateMany(
+      {
+        recipient: new Types.ObjectId(userId),
+        activity: new Types.ObjectId(activityId),
         type: { $nin: ['private_activity_message', 'general_chat_message'] },
         readAt: { $exists: false },
       },

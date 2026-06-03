@@ -58,6 +58,7 @@ export interface ActivityFilters {
   zonaPrincipal?: string;
   estado?: ActivityStatusFilter;
   sort?: ActivitySort;
+  limit?: number;
 }
 
 export async function fetchActivities(filters: ActivityFilters = {}) {

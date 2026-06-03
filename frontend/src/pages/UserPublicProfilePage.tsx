@@ -19,12 +19,6 @@ function formatDate(value?: string) {
   }).format(new Date(value));
 }
 
-const TRUST_BADGES: Record<string, string> = {
-  perfil_completo: 'Perfil completo',
-  organizador_activo: 'Organizador activo',
-  participante_activo: 'Participante activo',
-};
-
 export default function UserPublicProfilePage() {
   const navigate = useNavigate();
   const { userId } = useParams();
@@ -125,13 +119,6 @@ export default function UserPublicProfilePage() {
                       Participante activo
                     </span>
                   </div>
-                  {profile.stats.logros.length > 0 && (
-                    <ul className="trust-achievements">
-                      {profile.stats.logros.map((logro) => (
-                        <li key={logro}>{TRUST_BADGES[logro] ?? logro}</li>
-                      ))}
-                    </ul>
-                  )}
                 </div>
               )}
               {profile.ciudad && <p><span>Ciudad:</span> {profile.ciudad}</p>}

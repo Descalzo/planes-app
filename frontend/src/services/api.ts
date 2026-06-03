@@ -1,6 +1,14 @@
 import axios from 'axios';
 
-const baseURL = import.meta.env.VITE_API_URL ?? '';
+function getDefaultApiBaseUrl() {
+  if (!import.meta.env.DEV || typeof window === 'undefined') {
+    return '';
+  }
+
+  return `${window.location.protocol}//${window.location.hostname}:3000`;
+}
+
+const baseURL = import.meta.env.VITE_API_URL ?? getDefaultApiBaseUrl();
 export const AUTH_TOKEN_KEY = 'planes_jwt';
 
 export const api = axios.create({
@@ -25,3 +33,18 @@ export function getAuthToken() {
 }
 
 setAuthToken(getAuthToken());
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401) {
+      setAuthToken(null);
+      window.dispatchEvent(new Event('planes:auth-expired'));
+      if (window.location.pathname !== '/login') {
+        window.location.assign('/login');
+      }
+    }
+
+    return Promise.reject(error);
+  },
+);

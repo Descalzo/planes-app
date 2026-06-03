@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import ActivityCard from '../components/ActivityCard';
 import {
   Activity,
@@ -15,16 +14,24 @@ import {
   isUserRejectedFromActivity,
 } from '../services/activityService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
-import { fetchUnreadMessageActivityIds } from '../services/internalNotificationService';
-import { hasActivityUpdates } from '../services/notificationService';
+import {
+  fetchUnreadMessageActivityIds,
+  fetchUnreadStatusActivityIds,
+} from '../services/internalNotificationService';
+import {
+  getActivityTime,
+  hasActivityStarted,
+  isActivityArchived,
+  isActivityInPostEventGrace,
+} from '../utils/activityLifecycle';
 
 type View = 'creadas' | 'unidas' | 'solicitadas' | 'meGustan';
 
 const VIEW_LABELS: Record<View, string> = {
-  creadas: 'Creadas por mi',
   unidas: 'Me he unido',
   solicitadas: 'Solicitadas',
   meGustan: 'Guardadas',
+  creadas: 'Creadas por mí',
 };
 
 export default function MyActivitiesPage() {
@@ -34,7 +41,8 @@ export default function MyActivitiesPage() {
   const [savedActivityIds, setSavedActivityIds] = useState<Set<string>>(new Set());
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [unreadMessageActivityIds, setUnreadMessageActivityIds] = useState<Set<string>>(new Set());
-  const [view, setView] = useState<View>('creadas');
+  const [unreadStatusActivityIds, setUnreadStatusActivityIds] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<View>('unidas');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +53,7 @@ export default function MyActivitiesPage() {
     async function loadPageData() {
       try {
         const [activitiesData, requestedData, userData, savedData] = await Promise.all([
-          fetchActivities({ estado: 'todas', sort: 'fechaAsc' }),
+          fetchActivities({ estado: 'todas', sort: 'fechaAsc', limit: 120 }),
           fetchRequestedActivities().catch(() => [] as Activity[]),
           fetchCurrentUser(),
           fetchSavedActivities().catch(() => [] as Activity[]),
@@ -110,17 +118,27 @@ export default function MyActivitiesPage() {
     return createdActivities;
   }, [createdActivities, joinedActivities, requestedActivities, savedActivities, currentUserId, view]);
 
-  const { proximasActivities, pasadasActivities } = useMemo(() => {
+  const { proximasActivities, recentFinishedActivities, historyActivities } = useMemo(() => {
     const ahora = Date.now();
+
     return {
-      proximasActivities: visibleActivities.filter((a) => !a.fecha || new Date(a.fecha).getTime() >= ahora),
-      pasadasActivities: visibleActivities.filter((a) => a.fecha && new Date(a.fecha).getTime() < ahora),
+      proximasActivities: [...visibleActivities]
+        .filter((activity) => !hasActivityStarted(activity, ahora))
+        .sort((a, b) => getActivityTime(a) - getActivityTime(b)),
+      recentFinishedActivities: [...visibleActivities]
+        .filter((activity) => isActivityInPostEventGrace(activity, ahora))
+        .sort((a, b) => getActivityTime(b) - getActivityTime(a)),
+      historyActivities: [...visibleActivities]
+        .filter((activity) => isActivityArchived(activity, ahora))
+        .sort((a, b) => getActivityTime(b) - getActivityTime(a)),
     };
   }, [visibleActivities]);
+  const pasadasActivities = recentFinishedActivities;
 
   useEffect(() => {
     if (!currentUserId || chatActivities.length === 0) {
       setUnreadMessageActivityIds(new Set());
+      setUnreadStatusActivityIds(new Set());
       return;
     }
 
@@ -129,13 +147,18 @@ export default function MyActivitiesPage() {
 
     async function loadUnreadMessages() {
       try {
-        const activityIds = await fetchUnreadMessageActivityIds();
+        const [activityIds, statusActivityIds] = await Promise.all([
+          fetchUnreadMessageActivityIds(),
+          fetchUnreadStatusActivityIds(),
+        ]);
         if (isMounted) {
           setUnreadMessageActivityIds(new Set(activityIds.filter((id) => visibleChatActivityIds.has(id))));
+          setUnreadStatusActivityIds(new Set(statusActivityIds.filter((id) => visibleChatActivityIds.has(id))));
         }
       } catch {
         if (isMounted) {
           setUnreadMessageActivityIds(new Set());
+          setUnreadStatusActivityIds(new Set());
         }
       }
     }
@@ -189,9 +212,6 @@ export default function MyActivitiesPage() {
           <h1>Mis actividades</h1>
           <p>Planes que has creado, solicitado, guardado o a los que te has unido.</p>
         </div>
-        <div className="page-actions">
-          <Link className="button button--primary" to="/activities/new">Crear actividad</Link>
-        </div>
       </header>
       <section className="activities-stack">
         {isLoading && <p>Cargando tus actividades...</p>}
@@ -212,7 +232,7 @@ export default function MyActivitiesPage() {
             </div>
             <div className="section-heading">
               <h2>{VIEW_LABELS[view]}</h2>
-              <span className="section-heading__badge">{visibleActivities.length}</span>
+              <span className="section-heading__badge">{proximasActivities.length + recentFinishedActivities.length}</span>
             </div>
           </>
         )}
@@ -220,11 +240,11 @@ export default function MyActivitiesPage() {
           <p>{emptyMessages[view]}</p>
         )}
         {!isLoading && !error && visibleActivities.length > 0 && (() => {
-          const renderCard = (activity: Activity) => {
+          const renderCard = (activity: Activity, isFinished = false) => {
             const hasCreatorUpdates = Boolean(
               currentUserId &&
               isActivityCreator(activity, currentUserId) &&
-              hasActivityUpdates(activity, currentUserId),
+              unreadStatusActivityIds.has(activity._id),
             );
             const requestStatus =
               currentUserId && isUserPendingInActivity(activity, currentUserId)
@@ -240,7 +260,7 @@ export default function MyActivitiesPage() {
                 category={activity.categoria}
                 city={activity.ciudad}
                 zonaPrincipal={activity.zonaPrincipal}
-                estado={activity.estado}
+                estado={isFinished ? 'finalizada' : activity.estado}
                 date={activity.fecha}
                 spots={activity.plazas}
                 occupiedSpots={activity.plazasOcupadas}
@@ -249,13 +269,13 @@ export default function MyActivitiesPage() {
                 participants={getActivityParticipantsCount(activity, currentUserId)}
                 isJoined={Boolean(currentUserId && isUserInActivity(activity, currentUserId))}
                 isCreator={Boolean(currentUserId && isActivityCreator(activity, currentUserId))}
-                requestStatus={requestStatus}
-                hasActivityUpdates={hasCreatorUpdates}
+                requestStatus={isFinished ? undefined : requestStatus}
+                hasActivityUpdates={!isFinished && hasCreatorUpdates}
                 hasUnreadMessages={unreadMessageActivityIds.has(activity._id)}
-                leftUsersCount={hasCreatorUpdates ? activity.salidas?.length ?? 0 : 0}
+                leftUsersCount={0}
                 isSaved={savedActivityIds.has(activity._id)}
-                privateChatUserId={requestStatus && currentUserId ? currentUserId : undefined}
-                onToggleSave={currentUserId ? () => handleToggleSave(activity._id) : undefined}
+                privateChatUserId={!isFinished && requestStatus && currentUserId ? currentUserId : undefined}
+                onToggleSave={!isFinished && currentUserId ? () => handleToggleSave(activity._id) : undefined}
               />
             );
           };
@@ -263,21 +283,22 @@ export default function MyActivitiesPage() {
             <>
               {proximasActivities.length > 0 && (
                 <>
-                  {pasadasActivities.length > 0 && (
-                    <p className="activities-group__label">Próximas</p>
-                  )}
+                  <p className="activities-group__label">Proximas</p>
                   <div className="activity-grid">
-                    {proximasActivities.map(renderCard)}
+                    {proximasActivities.map((activity) => renderCard(activity))}
                   </div>
                 </>
               )}
               {pasadasActivities.length > 0 && (
                 <>
-                  <p className="activities-group__label">Pasadas</p>
-                  <div className="activity-grid">
-                    {pasadasActivities.map(renderCard)}
+                  <p className="activities-group__label">Finalizadas recientemente</p>
+                  <div className="activity-grid activity-grid--finished">
+                    {pasadasActivities.map((activity) => renderCard(activity, true))}
                   </div>
                 </>
+              )}
+              {proximasActivities.length === 0 && pasadasActivities.length === 0 && (
+                <p>{emptyMessages[view]}</p>
               )}
             </>
           );

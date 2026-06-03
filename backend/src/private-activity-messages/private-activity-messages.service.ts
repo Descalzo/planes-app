@@ -157,9 +157,14 @@ export class PrivateActivityMessagesService {
     const activity = await this.activityModel.findById(activityId).exec();
     if (!activity) return false;
     const creatorId = activity.creador.toString();
-    const participantIds = (activity.participantes ?? []).map((p) => p.toString());
-    if (userId === creatorId) return participantIds.includes(otherUserId);
-    if (otherUserId === creatorId) return participantIds.includes(userId);
+    const interestedUserIds = [
+      ...(activity.participantes ?? []),
+      ...(activity.solicitudesPendientes ?? []),
+      ...(activity.solicitudesRechazadas ?? []),
+    ].map((p) => p.toString());
+
+    if (userId === creatorId) return otherUserId !== creatorId;
+    if (otherUserId === creatorId) return userId !== creatorId;
     return false;
   }
 

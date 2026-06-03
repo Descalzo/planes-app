@@ -14,6 +14,7 @@ import MessagesPage from '../pages/MessagesPage';
 import PrivateActivityChatPage from '../pages/PrivateActivityChatPage';
 import PrivateConversationsPage from '../pages/PrivateConversationsPage';
 import SettingsPage from '../pages/SettingsPage';
+import ActivityHistoryPage from '../pages/ActivityHistoryPage';
 import { getAuthToken } from '../services/api';
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
@@ -131,6 +132,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/activity-history"
+        element={
+          <ProtectedRoute>
+            <ActivityHistoryPage />
           </ProtectedRoute>
         }
       />

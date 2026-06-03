@@ -26,8 +26,9 @@ export class ActivitiesController {
     @Query('zonaPrincipal') zonaPrincipal?: string,
     @Query('estado') estado?: string,
     @Query('sort') sort?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.activitiesService.findAll({ categoria, ciudad, zonaPrincipal, estado, sort });
+    return this.activitiesService.findAll({ categoria, ciudad, zonaPrincipal, estado, sort, limit });
   }
 
   @Get('saved')

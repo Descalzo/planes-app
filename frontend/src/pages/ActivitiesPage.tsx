@@ -14,8 +14,10 @@ import {
   isUserInActivity,
 } from '../services/activityService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
-import { fetchUnreadMessageActivityIds } from '../services/internalNotificationService';
-import { hasActivityUpdates } from '../services/notificationService';
+import {
+  fetchUnreadMessageActivityIds,
+  fetchUnreadStatusActivityIds,
+} from '../services/internalNotificationService';
 import { CATEGORIES, CATEGORY_VISUALS } from '../utils/activityImages';
 import { PROVINCIAS } from '../utils/provincias';
 
@@ -46,6 +48,7 @@ export default function ActivitiesPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [unreadMessageActivityIds, setUnreadMessageActivityIds] = useState<Set<string>>(new Set());
+  const [unreadStatusActivityIds, setUnreadStatusActivityIds] = useState<Set<string>>(new Set());
   const [selectedCategory, setSelectedCategory] = useState('');
   const [zonaPrincipalFilter, setZonaPrincipalFilter] = useState('');
   const [mostrarFinalizadas, setMostrarFinalizadas] = useState(false);
@@ -59,22 +62,17 @@ export default function ActivitiesPage() {
     let isMounted = true;
     let isFirstLoad = true;
 
-    async function loadPageData() {
+    async function loadActivities() {
       try {
-        const [activitiesData, userData, savedData] = await Promise.all([
-          fetchActivities({
-            categoria: selectedCategory,
-            zonaPrincipal: zonaPrincipalFilter || undefined,
-            estado: mostrarFinalizadas ? 'todas' : 'futuras',
-            sort,
-          }),
-          fetchCurrentUser(),
-          fetchSavedActivities().catch(() => [] as Activity[]),
-        ]);
+        const activitiesData = await fetchActivities({
+          categoria: selectedCategory,
+          zonaPrincipal: zonaPrincipalFilter || undefined,
+          estado: mostrarFinalizadas ? 'todas' : 'futuras',
+          sort,
+          limit: 60,
+        });
         if (isMounted) {
           setActivities(activitiesData);
-          setCurrentUser(userData);
-          setSavedActivityIds(new Set(savedData.map((a) => a._id)));
           setError(null);
         }
       } catch {
@@ -89,10 +87,10 @@ export default function ActivitiesPage() {
       }
     }
 
-    loadPageData();
+    loadActivities();
     const intervalId = window.setInterval(() => {
       if (!isFirstLoad) {
-        loadPageData();
+        loadActivities();
       }
     }, 8000);
 
@@ -101,6 +99,30 @@ export default function ActivitiesPage() {
       window.clearInterval(intervalId);
     };
   }, [selectedCategory, zonaPrincipalFilter, mostrarFinalizadas, sort]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    fetchCurrentUser()
+      .then((userData) => {
+        if (isMounted) setCurrentUser(userData);
+      })
+      .catch(() => {
+        if (isMounted) setCurrentUser(null);
+      });
+
+    fetchSavedActivities()
+      .then((savedData) => {
+        if (isMounted) setSavedActivityIds(new Set(savedData.map((a) => a._id)));
+      })
+      .catch(() => {
+        if (isMounted) setSavedActivityIds(new Set());
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
 
@@ -166,6 +188,7 @@ export default function ActivitiesPage() {
   useEffect(() => {
     if (!currentUserId || activities.length === 0) {
       setUnreadMessageActivityIds(new Set());
+      setUnreadStatusActivityIds(new Set());
       return;
     }
 
@@ -178,13 +201,18 @@ export default function ActivitiesPage() {
 
     async function loadUnreadMessages() {
       try {
-        const activityIds = await fetchUnreadMessageActivityIds();
+        const [activityIds, statusActivityIds] = await Promise.all([
+          fetchUnreadMessageActivityIds(),
+          fetchUnreadStatusActivityIds(),
+        ]);
         if (isMounted) {
           setUnreadMessageActivityIds(new Set(activityIds.filter((id) => visibleActivityIds.has(id))));
+          setUnreadStatusActivityIds(new Set(statusActivityIds.filter((id) => visibleActivityIds.has(id))));
         }
       } catch {
         if (isMounted) {
           setUnreadMessageActivityIds(new Set());
+          setUnreadStatusActivityIds(new Set());
         }
       }
     }
@@ -311,7 +339,7 @@ export default function ActivitiesPage() {
             const hasCreatorUpdates = Boolean(
               currentUserId &&
               isActivityCreator(activity, currentUserId) &&
-              hasActivityUpdates(activity, currentUserId)
+              unreadStatusActivityIds.has(activity._id)
             );
 
             return (
@@ -333,7 +361,7 @@ export default function ActivitiesPage() {
                 isRemoved={Boolean(currentUserId && isUserRemovedFromActivity(activity, currentUserId))}
                 hasActivityUpdates={hasCreatorUpdates}
                 hasUnreadMessages={unreadMessageActivityIds.has(activity._id)}
-                leftUsersCount={hasCreatorUpdates ? activity.salidas?.length ?? 0 : 0}
+                leftUsersCount={0}
                 estado={activity.estado}
                 isSaved={savedActivityIds.has(activity._id)}
                 onToggleSave={currentUserId ? () => handleToggleSave(activity._id) : undefined}

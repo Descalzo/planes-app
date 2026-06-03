@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiParam, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -13,8 +13,8 @@ export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
-  findForCurrentUser(@CurrentUser() user: { id: string }) {
-    return this.notificationsService.findForUser(user.id);
+  findForCurrentUser(@CurrentUser() user: { id: string }, @Query('limit') limit?: string) {
+    return this.notificationsService.findForUser(user.id, limit);
   }
 
   @Get('unread-count')
@@ -34,6 +34,13 @@ export class NotificationsController {
       .then((activityIds) => ({ activityIds }));
   }
 
+  @Get('unread-status-activity-ids')
+  getUnreadStatusActivityIds(@CurrentUser() user: { id: string }) {
+    return this.notificationsService
+      .getUnreadStatusActivityIds(user.id)
+      .then((activityIds) => ({ activityIds }));
+  }
+
   @Get('unread-private-message-actor-ids/:activityId')
   @ApiParam({ name: 'activityId', description: 'ID de la actividad', type: String })
   getUnreadPrivateMessageActorIds(
@@ -48,6 +55,15 @@ export class NotificationsController {
   @Patch('status/mark-all-read')
   markAllStatusRead(@CurrentUser() user: { id: string }) {
     return this.notificationsService.markAllStatusRead(user.id).then(() => ({ ok: true }));
+  }
+
+  @Patch('status/read-by-activity/:activityId')
+  @ApiParam({ name: 'activityId', description: 'ID de la actividad', type: String })
+  markStatusReadByActivity(
+    @Param('activityId', ParseObjectIdPipe) activityId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.notificationsService.markStatusReadByActivity(activityId, user.id).then(() => ({ ok: true }));
   }
 
   @Patch('messages/read-by-activity/:activityId')

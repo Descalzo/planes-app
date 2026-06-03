@@ -102,14 +102,17 @@ export default function MessageList({ activityId, currentUserId, messages: exter
       {error && <p role="alert">{error}</p>}
       {!isLoading && !error && messages.length === 0 && <p>Sin mensajes todavia.</p>}
       <div className="message-list__box">
-        {messages.map((message) => {
+        {messages.map((message, index) => {
           const isOwn = Boolean(currentUserId && getAuthorId(message) === currentUserId);
+          const authorId = getAuthorId(message);
+          const previousAuthorId = index > 0 ? getAuthorId(messages[index - 1]) : null;
+          const showAuthor = !isOwn && authorId !== previousAuthorId;
           return (
             <div
               key={message._id}
-              className={`message-bubble ${isOwn ? 'message-bubble--own' : 'message-bubble--other'}`}
+              className={`message-bubble ${isOwn ? 'message-bubble--own' : 'message-bubble--other'}${showAuthor ? '' : ' message-bubble--stacked'}`}
             >
-              {!isOwn && <span className="message-bubble__author">{getAuthorName(message)}</span>}
+              {showAuthor && <span className="message-bubble__author">{getAuthorName(message)}</span>}
               <p className="message-bubble__text">{message.text}</p>
             </div>
           );
