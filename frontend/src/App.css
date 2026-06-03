@@ -1101,18 +1101,59 @@ button:disabled {
   padding: 0.55rem 0.65rem;
 }
 
-.participant-row > div:first-child {
+.participant-row__info {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   min-width: 0;
+  flex-wrap: wrap;
 }
 
 .participant-row strong {
-  display: block;
   line-height: 1.25;
 }
 
-.participant-row span {
-  color: var(--success);
+.participant-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  font-size: 0.68rem;
   font-weight: 700;
+  border-radius: var(--r-pill);
+  padding: 0.15rem 0.5rem;
+  background: var(--surface-2);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.participant-badge--pending {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.participant-badge--muted {
+  background: var(--surface-2);
+  color: var(--text-3);
+}
+
+.participant-badge--danger {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.participant-badge--neutral {
+  background: var(--surface-2);
+  color: var(--text-3);
+}
+
+.participant-row--request {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+}
+
+.participant-row--request .participant-actions {
+  justify-content: flex-start;
 }
 
 .participant-actions {
@@ -1123,36 +1164,34 @@ button:disabled {
 }
 
 .participant-actions .button,
-.participant-actions button,
-.participant-more summary {
+.participant-actions button {
   min-height: 2rem;
   border-radius: var(--r-pill);
   padding: 0.38rem 0.72rem;
   text-align: center;
 }
 
-.participant-actions--review {
-  align-items: center;
+.button--accept {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border: 1.5px solid transparent;
+  font-weight: 700;
+}
+
+.button--accept:hover:not(:disabled) {
+  background: var(--success);
+  color: #fff;
 }
 
 .participant-more {
   position: relative;
 }
 
-.participant-more summary {
-  list-style: none;
-  cursor: pointer;
-}
-
-.participant-more summary::-webkit-details-marker {
-  display: none;
-}
-
 .participant-more__menu {
   position: absolute;
   right: 0;
   top: calc(100% + 0.35rem);
-  z-index: 5;
+  z-index: 10;
   display: grid;
   gap: 0.35rem;
   width: max-content;

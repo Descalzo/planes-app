@@ -62,6 +62,7 @@ export default function ActivityDetailPage() {
   const [mutingParticipantId, setMutingParticipantId] = useState<string | null>(null);
   const [unbanningParticipantId, setUnbanningParticipantId] = useState<string | null>(null);
   const [requestActionId, setRequestActionId] = useState<string | null>(null);
+  const [openParticipantMenuId, setOpenParticipantMenuId] = useState<string | null>(null);
   const [privateConversations, setPrivateConversations] = useState<PrivateActivityConversation[]>([]);
   const [unreadPrivateActorIds, setUnreadPrivateActorIds] = useState<Set<string>>(new Set());
   const [isSaved, setIsSaved] = useState(false);
@@ -166,6 +167,16 @@ export default function ActivityDetailPage() {
       window.removeEventListener('planes:messages-changed', loadPrivateConversations);
     };
   }, [activityId, activity, currentUserId]);
+
+  useEffect(() => {
+    if (!openParticipantMenuId) return;
+    function handleOutside(e: PointerEvent) {
+      if ((e.target as Element).closest('.participant-more')) return;
+      setOpenParticipantMenuId(null);
+    }
+    document.addEventListener('pointerdown', handleOutside);
+    return () => document.removeEventListener('pointerdown', handleOutside);
+  }, [openParticipantMenuId]);
 
   async function handleJoin() {
     if (!activityId) {
@@ -413,12 +424,12 @@ export default function ActivityDetailPage() {
                           }
 
                           return (
-                            <div className="participant-row" key={userId}>
-                              <div>
+                            <div className="participant-row participant-row--request" key={userId}>
+                              <div className="participant-row__info">
                                 <strong>{getReferenceName(user)}</strong>
-                                <span> Pendiente</span>
+                                <span className="participant-badge participant-badge--pending">Pendiente</span>
                               </div>
-                              <div className="participant-actions participant-actions--review">
+                              <div className="participant-actions">
                                 <Link
                                   className="button button--ghost button--small"
                                   to={`/users/${userId}/profile?activityId=${activityId}`}
@@ -426,7 +437,7 @@ export default function ActivityDetailPage() {
                                   Ver perfil
                                 </Link>
                                 <button
-                                  className="button button--secondary button--small"
+                                  className="button button--accept button--small"
                                   type="button"
                                   disabled={requestActionId === userId || isFull}
                                   onClick={() => handleAcceptRequest(userId)}
@@ -463,46 +474,56 @@ export default function ActivityDetailPage() {
 
                       return (
                         <div className="participant-row" key={participantId}>
-                          <div>
+                          <div className="participant-row__info">
                             <strong>{getReferenceName(participant)}</strong>
-                            {isCurrentCreator && <span> Tú (Creador)</span>}
-                            {isMuted && <span> Silenciado</span>}
+                            {isCurrentCreator && <span className="participant-badge">Tú · Organizador</span>}
+                            {isMuted && <span className="participant-badge participant-badge--muted">Silenciado</span>}
                           </div>
                           <div className="participant-actions">
                             {!isCurrentCreator && (
-                              <Link 
-                                className="button button--ghost button--small" 
+                              <Link
+                                className="button button--ghost button--small"
                                 to={`/users/${participantId}/profile?activityId=${activityId}`}
                               >
                                 Ver perfil
                               </Link>
                             )}
                             {!isArchived && !isCurrentCreator && (
-                              <details className="participant-more">
-                                <summary className="button button--ghost button--small">Mas</summary>
-                                <div className="participant-more__menu">
-                                  <button
-                                    className="button button--ghost button--small"
-                                    type="button"
-                                    disabled={mutingParticipantId === participantId}
-                                    onClick={() => handleToggleMute(participantId, isMuted)}
-                                  >
-                                    {mutingParticipantId === participantId
-                                      ? 'Guardando...'
-                                      : isMuted
-                                        ? 'Permitir hablar'
-                                        : 'Silenciar chat'}
-                                  </button>
-                                  <button
-                                    className="button button--ghost button--small"
-                                    type="button"
-                                    disabled={removingParticipantId === participantId}
-                                    onClick={() => handleRemoveParticipant(participantId)}
-                                  >
-                                    {removingParticipantId === participantId ? 'Quitando...' : 'Quitar'}
-                                  </button>
-                                </div>
-                              </details>
+                              <div className="participant-more">
+                                <button
+                                  className="button button--ghost button--small"
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenParticipantMenuId((prev) => prev === participantId ? null : participantId);
+                                  }}
+                                >
+                                  Más
+                                </button>
+                                {openParticipantMenuId === participantId && (
+                                  <div className="participant-more__menu">
+                                    <button
+                                      className="button button--ghost button--small"
+                                      type="button"
+                                      disabled={mutingParticipantId === participantId}
+                                      onClick={() => { handleToggleMute(participantId, isMuted); setOpenParticipantMenuId(null); }}
+                                    >
+                                      {mutingParticipantId === participantId
+                                        ? 'Guardando...'
+                                        : isMuted
+                                          ? 'Permitir hablar'
+                                          : 'Silenciar chat'}
+                                    </button>
+                                    <button
+                                      className="button button--ghost button--small"
+                                      type="button"
+                                      disabled={removingParticipantId === participantId}
+                                      onClick={() => { handleRemoveParticipant(participantId); setOpenParticipantMenuId(null); }}
+                                    >
+                                      {removingParticipantId === participantId ? 'Quitando...' : 'Quitar'}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>
@@ -521,9 +542,9 @@ export default function ActivityDetailPage() {
 
                         return (
                           <div className="participant-row" key={userId}>
-                            <div>
+                            <div className="participant-row__info">
                               <strong>{getReferenceName(user)}</strong>
-                              <span> Se desapunto</span>
+                              <span className="participant-badge participant-badge--neutral">Se desapuntó</span>
                             </div>
                           </div>
                         );
@@ -543,9 +564,9 @@ export default function ActivityDetailPage() {
 
                         return (
                           <div className="participant-row" key={userId}>
-                            <div>
+                            <div className="participant-row__info">
                               <strong>{getReferenceName(user)}</strong>
-                              <span> No puede escribir en el chat</span>
+                              <span className="participant-badge participant-badge--muted">Silenciado del chat</span>
                             </div>
                             {!isArchived && (
                               <button
@@ -575,9 +596,9 @@ export default function ActivityDetailPage() {
 
                         return (
                           <div className="participant-row" key={userId}>
-                            <div>
+                            <div className="participant-row__info">
                               <strong>{getReferenceName(user)}</strong>
-                              <span> No puede volver a unirse</span>
+                              <span className="participant-badge participant-badge--danger">Expulsado</span>
                             </div>
                             {!isArchived && (
                               <button
