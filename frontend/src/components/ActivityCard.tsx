@@ -26,6 +26,7 @@ interface ActivityCardProps {
   isSaved?: boolean;
   privateChatUserId?: string;
   onToggleSave?: () => void;
+  compact?: boolean;
 }
 
 export default function ActivityCard({
@@ -51,6 +52,7 @@ export default function ActivityCard({
   isSaved = false,
   privateChatUserId,
   onToggleSave,
+  compact = false,
 }: ActivityCardProps) {
   const totalSpots = typeof spots === 'number' ? spots : 10;
   const usedSpots = typeof occupiedSpots === 'number' ? occupiedSpots : participants;
@@ -64,6 +66,7 @@ export default function ActivityCard({
     : 'Fecha por definir';
   const cardClassName = [
     'activity-card',
+    compact ? 'activity-card--compact' : '',
     isRemoved ? 'activity-card--removed' : '',
     isJoined && !isRemoved ? 'activity-card--joined' : '',
     estado === 'finalizada' ? 'activity-card--finished' : '',

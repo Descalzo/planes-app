@@ -231,8 +231,10 @@ export default function MyActivitiesPage() {
               ))}
             </div>
             <div className="section-heading">
-              <h2>{VIEW_LABELS[view]}</h2>
-              <span className="section-heading__badge">{proximasActivities.length + recentFinishedActivities.length}</span>
+              <div className="section-heading__title">
+                <h2>{VIEW_LABELS[view]}</h2>
+                <span className="section-heading__badge">{proximasActivities.length + recentFinishedActivities.length}</span>
+              </div>
             </div>
           </>
         )}
@@ -276,6 +278,7 @@ export default function MyActivitiesPage() {
                 isSaved={savedActivityIds.has(activity._id)}
                 privateChatUserId={!isFinished && requestStatus && currentUserId ? currentUserId : undefined}
                 onToggleSave={!isFinished && currentUserId ? () => handleToggleSave(activity._id) : undefined}
+                compact
               />
             );
           };
@@ -284,7 +287,7 @@ export default function MyActivitiesPage() {
               {proximasActivities.length > 0 && (
                 <>
                   <p className="activities-group__label">Proximas</p>
-                  <div className="activity-grid">
+                  <div className="activity-grid activity-grid--compact">
                     {proximasActivities.map((activity) => renderCard(activity))}
                   </div>
                 </>
@@ -292,7 +295,7 @@ export default function MyActivitiesPage() {
               {pasadasActivities.length > 0 && (
                 <>
                   <p className="activities-group__label">Finalizadas recientemente</p>
-                  <div className="activity-grid activity-grid--finished">
+                  <div className="activity-grid activity-grid--compact activity-grid--finished">
                     {pasadasActivities.map((activity) => renderCard(activity, true))}
                   </div>
                 </>
