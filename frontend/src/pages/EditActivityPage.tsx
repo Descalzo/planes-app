@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Activity, fetchActivity, updateActivity } from '../services/activityService';
+import { Activity, deleteActivity, fetchActivity, updateActivity } from '../services/activityService';
 import { CATEGORIES } from '../utils/activityImages';
 import { PROVINCIAS } from '../utils/provincias';
 import ImageUploadField from '../components/ImageUploadField';
@@ -39,6 +39,7 @@ export default function EditActivityPage() {
   const [isImageUploading, setIsImageUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,6 +86,27 @@ export default function EditActivityPage() {
       setError(getErrorMessage(caughtError));
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!activityId) return;
+    const confirmed = window.confirm(
+      '¿Seguro que quieres eliminar esta actividad? Se borraran tambien sus chats y notificaciones. Esta accion no se puede deshacer.',
+    );
+    if (!confirmed) return;
+
+    setError(null);
+    setIsDeleting(true);
+    try {
+      await deleteActivity(activityId);
+      window.dispatchEvent(new Event('planes:messages-changed'));
+      window.dispatchEvent(new Event('planes:notifications-changed'));
+      navigate('/my-activities');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError));
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -154,14 +176,29 @@ export default function EditActivityPage() {
           <button
             className="button button--ghost"
             type="button"
+            disabled={isDeleting}
             onClick={() => navigate(`/activities/${activityId}`)}
           >
             Cancelar
           </button>
-          <button className="button button--primary" type="submit" disabled={isSubmitting || isImageUploading}>
+          <button className="button button--primary" type="submit" disabled={isSubmitting || isImageUploading || isDeleting}>
             {isSubmitting ? 'Guardando...' : isImageUploading ? 'Subiendo imagen...' : 'Guardar cambios'}
           </button>
         </div>
+        <section className="danger-zone">
+          <div>
+            <h2>Eliminar actividad</h2>
+            <p>Elimina la actividad, sus chats y las notificaciones asociadas.</p>
+          </div>
+          <button
+            className="button button--danger"
+            type="button"
+            disabled={isSubmitting || isImageUploading || isDeleting}
+            onClick={handleDelete}
+          >
+            {isDeleting ? 'Eliminando...' : 'Eliminar actividad'}
+          </button>
+        </section>
       </form>
     </main>
   );

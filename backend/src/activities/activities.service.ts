@@ -6,6 +6,8 @@ import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { NotificationsService } from '../notifications/notifications.service';
+import { Message, MessageDocument } from '../messages/schemas/message.schema';
+import { PrivateActivityMessage, PrivateActivityMessageDocument } from '../private-activity-messages/schemas/private-activity-message.schema';
 
 type ActivitiesStatusFilter = 'futuras' | 'pasadas' | 'todas';
 type ActivitiesSort = 'fechaAsc' | 'createdDesc' | 'createdAsc';
@@ -24,6 +26,8 @@ export class ActivitiesService {
   constructor(
     @InjectModel(Activity.name) private activityModel: Model<ActivityDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Message.name) private messageModel: Model<MessageDocument>,
+    @InjectModel(PrivateActivityMessage.name) private privateActivityMessageModel: Model<PrivateActivityMessageDocument>,
     private notificationsService: NotificationsService,
   ) {}
 
@@ -192,6 +196,27 @@ export class ActivitiesService {
     await activity.save();
     const [hydrated] = await this.hydrateActivities([activity]);
     return hydrated;
+  }
+
+  async remove(id: string, userId: string): Promise<{ ok: boolean }> {
+    const activity = await this.activityModel.findById(id).exec();
+    if (!activity) {
+      throw new NotFoundException(`Actividad con ID ${id} no encontrada`);
+    }
+
+    if (activity.creador.toString() !== userId) {
+      throw new ForbiddenException('Solo el creador puede eliminar esta actividad');
+    }
+
+    const activityObjectId = new Types.ObjectId(id);
+    await Promise.all([
+      this.messageModel.deleteMany({ activity: activityObjectId }).exec(),
+      this.privateActivityMessageModel.deleteMany({ activity: activityObjectId }).exec(),
+      this.notificationsService.deleteByActivity(id),
+    ]);
+    await activity.deleteOne();
+
+    return { ok: true };
   }
 
   async findAll(options: FindAllActivitiesOptions = {}): Promise<any[]> {

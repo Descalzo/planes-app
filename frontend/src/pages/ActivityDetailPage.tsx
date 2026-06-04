@@ -25,6 +25,7 @@ import {
 } from '../services/activityService';
 import { CurrentUser, fetchCurrentUser, fetchUserPublicProfile } from '../services/authService';
 import {
+  fetchUnreadMessageActivityIds,
   fetchUnreadPrivateMessageActorIds,
   markStatusNotificationsReadByActivity,
 } from '../services/internalNotificationService';
@@ -96,6 +97,7 @@ export default function ActivityDetailPage() {
   const [unbanningParticipantId, setUnbanningParticipantId] = useState<string | null>(null);
   const [requestActionId, setRequestActionId] = useState<string | null>(null);
   const [openParticipantMenuId, setOpenParticipantMenuId] = useState<string | null>(null);
+  const [hasUnreadGeneralMessages, setHasUnreadGeneralMessages] = useState(false);
   const [unreadPrivateActorIds, setUnreadPrivateActorIds] = useState<Set<string>>(new Set());
   const [profilePhotoUrls, setProfilePhotoUrls] = useState<Record<string, string>>({});
   const [isSaved, setIsSaved] = useState(false);
@@ -164,6 +166,7 @@ export default function ActivityDetailPage() {
 
   useEffect(() => {
     if (!activityId || !activity || !currentUserId) {
+      setHasUnreadGeneralMessages(false);
       setUnreadPrivateActorIds(new Set());
       return;
     }
@@ -173,12 +176,17 @@ export default function ActivityDetailPage() {
 
     async function loadUnreadPrivateMessages() {
       try {
-        const actorIds = await fetchUnreadPrivateMessageActorIds(currentActivityId);
+        const [activityIds, actorIds] = await Promise.all([
+          fetchUnreadMessageActivityIds(),
+          fetchUnreadPrivateMessageActorIds(currentActivityId),
+        ]);
         if (isMounted) {
+          setHasUnreadGeneralMessages(activityIds.includes(currentActivityId));
           setUnreadPrivateActorIds(new Set(actorIds));
         }
       } catch {
         if (isMounted) {
+          setHasUnreadGeneralMessages(false);
           setUnreadPrivateActorIds(new Set());
         }
       }
@@ -826,12 +834,15 @@ export default function ActivityDetailPage() {
                 </>
               )}
               {!hasStarted && isCreator && activityId && (
-                <Link className="button button--primary detail-actions__primary" to={`/activities/${activityId}/edit`}>
+                <Link className="button button--ghost detail-actions__primary" to={`/activities/${activityId}/edit`}>
                   Editar
                 </Link>
               )}
               {canUseChat && activityId && (isCreator || isJoined) && (
-                <Link className="button button--secondary detail-actions__primary" to={`/activities/${activityId}/chat`}>
+                <Link
+                  className={`button detail-actions__primary${hasUnreadGeneralMessages ? ' button--chat-unread' : ' button--secondary'}`}
+                  to={`/activities/${activityId}/chat`}
+                >
                   Ir al chat
                 </Link>
               )}

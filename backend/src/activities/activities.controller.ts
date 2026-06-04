@@ -56,6 +56,14 @@ export class ActivitiesController {
     return this.activitiesService.update(id, updateActivityDto, user.id);
   }
 
+  @Patch(':id/delete')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiParam({ name: 'id', description: 'ID de la actividad', type: String })
+  remove(@Param('id', ParseObjectIdPipe) id: string, @CurrentUser() user: { id: string }) {
+    return this.activitiesService.remove(id, user.id);
+  }
+
   @Patch(':id/save')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT')

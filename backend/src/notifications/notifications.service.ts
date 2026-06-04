@@ -151,6 +151,12 @@ export class NotificationsService {
     return activityIds.map((activityId) => activityId.toString());
   }
 
+  async deleteByActivity(activityId: string) {
+    await this.notificationModel.deleteMany({
+      activity: new Types.ObjectId(activityId),
+    });
+  }
+
   async getUnreadPrivateMessageActorIds(activityId: string, userId: string) {
     const actorIds = await this.notificationModel.distinct('actor', {
       recipient: new Types.ObjectId(userId),

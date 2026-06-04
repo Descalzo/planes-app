@@ -91,6 +91,10 @@ export async function updateActivity(activityId: string, payload: ActivityUpdate
   return response.data;
 }
 
+export async function deleteActivity(activityId: string) {
+  await api.patch(`/activities/${activityId}/delete`, {});
+}
+
 export async function joinActivity(activityId: string) {
   const response = await api.patch<Activity>(`/activities/${activityId}/join`, {});
   return response.data;
