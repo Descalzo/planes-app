@@ -38,3 +38,8 @@ export async function markPrivateActivityConversationActive(activityId: string, 
   const response = await api.patch<{ ok: boolean }>(`/activities/${activityId}/private-chat/${userId}/active`, {});
   return response.data;
 }
+
+export async function markPrivateActivityConversationInactive(activityId: string, userId: string) {
+  const response = await api.patch<{ ok: boolean }>(`/activities/${activityId}/private-chat/${userId}/inactive`, {});
+  return response.data;
+}

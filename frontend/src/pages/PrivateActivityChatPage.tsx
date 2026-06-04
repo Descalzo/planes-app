@@ -11,10 +11,11 @@ import { CurrentUser, fetchCurrentUser } from '../services/authService';
 import {
   fetchPrivateActivityMessages,
   markPrivateActivityConversationActive,
+  markPrivateActivityConversationInactive,
   PrivateActivityMessage,
   sendPrivateActivityMessage,
 } from '../services/privateActivityChatService';
-import { markMessagesReadByActivity } from '../services/internalNotificationService';
+import { markPrivateMessagesReadByActivityAndActor } from '../services/internalNotificationService';
 import { markPrivateChatSeen } from '../services/notificationService';
 import { getSocket } from '../services/socketService';
 import { isActivityArchived } from '../utils/activityLifecycle';
@@ -55,7 +56,9 @@ export default function PrivateActivityChatPage() {
   const currentActivityId = activityId ?? '';
   const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
   const conversationUserId = userId ?? currentUserId ?? '';
+  const creatorId = activity ? getReferenceId(activity.creador) : null;
   const isCreator = Boolean(activity && currentUserId && isActivityCreator(activity, currentUserId));
+  const chatPeerId = isCreator ? conversationUserId : creatorId;
   const isArchived = Boolean(activity && isActivityArchived(activity));
   const canWriteChat = !isArchived;
 
@@ -81,7 +84,13 @@ export default function PrivateActivityChatPage() {
           messagesData.forEach((m) => seenIds.current.add(m._id));
           setMessages(messagesData);
           const viewerId = userData._id ?? userData.id ?? null;
-          markPrivateChatSeen(currentActivityId, conversationUserId, viewerId);
+          const peerId = isActivityCreator(activityData, viewerId ?? '')
+            ? conversationUserId
+            : getReferenceId(activityData.creador);
+          if (peerId) {
+            markPrivateChatSeen(currentActivityId, peerId, viewerId);
+            markPrivateMessagesReadByActivityAndActor(currentActivityId, peerId).catch(() => {});
+          }
           setError(null);
         }
       } catch (caughtError) {
@@ -103,19 +112,20 @@ export default function PrivateActivityChatPage() {
   }, [currentActivityId, conversationUserId]);
 
   useEffect(() => {
-    if (!currentActivityId) return;
-    markMessagesReadByActivity(currentActivityId).catch(() => {});
+    if (!currentActivityId || !chatPeerId) return;
+    markPrivateMessagesReadByActivityAndActor(currentActivityId, chatPeerId).catch(() => {});
     window.dispatchEvent(new Event('planes:messages-changed'));
-  }, [currentActivityId]);
+  }, [currentActivityId, chatPeerId]);
 
   useEffect(() => {
-    if (!currentActivityId || !conversationUserId || !canWriteChat) return;
+    if (!currentActivityId || !chatPeerId || !canWriteChat) return;
+    const peerId = chatPeerId;
 
     let isMounted = true;
 
     async function markActive() {
       try {
-        await markPrivateActivityConversationActive(currentActivityId, conversationUserId);
+        await markPrivateActivityConversationActive(currentActivityId, peerId);
       } catch {
         if (!isMounted) return;
       }
@@ -127,12 +137,14 @@ export default function PrivateActivityChatPage() {
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
+      markPrivateActivityConversationInactive(currentActivityId, peerId).catch(() => {});
     };
-  }, [currentActivityId, conversationUserId, canWriteChat]);
+  }, [currentActivityId, chatPeerId, canWriteChat]);
 
   // WebSocket: private chat real-time
   useEffect(() => {
-    if (!currentActivityId || !conversationUserId || !canWriteChat) return;
+    if (!currentActivityId || !chatPeerId || !canWriteChat) return;
+    const peerId = chatPeerId;
 
     const socket = getSocket();
 
@@ -142,8 +154,8 @@ export default function PrivateActivityChatPage() {
       return (
         message.activity === currentActivityId &&
         Boolean(currentUserId) &&
-        ((senderId === currentUserId && receiverId === conversationUserId) ||
-          (senderId === conversationUserId && receiverId === currentUserId))
+        ((senderId === currentUserId && receiverId === peerId) ||
+          (senderId === peerId && receiverId === currentUserId))
       );
     }
 
@@ -152,13 +164,13 @@ export default function PrivateActivityChatPage() {
       if (seenIds.current.has(message._id)) return;
       seenIds.current.add(message._id);
       setMessages((prev) => [...prev, message]);
-      markPrivateChatSeen(currentActivityId, conversationUserId, currentUserId);
-      markMessagesReadByActivity(currentActivityId).catch(() => {});
+      markPrivateChatSeen(currentActivityId, peerId, currentUserId);
+      markPrivateMessagesReadByActivityAndActor(currentActivityId, peerId).catch(() => {});
       window.dispatchEvent(new Event('planes:messages-changed'));
     }
 
     function joinRoom() {
-      socket.emit('joinPrivateChat', { activityId: currentActivityId, otherUserId: conversationUserId });
+      socket.emit('joinPrivateChat', { activityId: currentActivityId, otherUserId: peerId });
     }
 
     if (socket.connected) joinRoom();
@@ -168,11 +180,12 @@ export default function PrivateActivityChatPage() {
     socket.on('connect', joinRoom);
 
     return () => {
-      socket.emit('leavePrivateChat', { activityId: currentActivityId, otherUserId: conversationUserId });
+      socket.emit('leavePrivateChat', { activityId: currentActivityId, otherUserId: peerId });
+      markPrivateActivityConversationInactive(currentActivityId, peerId).catch(() => {});
       socket.off('newPrivateMessage', onNewPrivateMessage);
       socket.off('connect', joinRoom);
     };
-  }, [currentActivityId, conversationUserId, currentUserId, canWriteChat]);
+  }, [currentActivityId, chatPeerId, currentUserId, canWriteChat]);
 
   useEffect(() => {
     const messagesBox = messagesBoxRef.current;

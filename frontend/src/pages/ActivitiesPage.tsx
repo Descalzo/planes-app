@@ -16,6 +16,7 @@ import {
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
 import {
   fetchUnreadMessageActivityIds,
+  fetchUnreadPrivateMessageActivityIds,
   fetchUnreadStatusActivityIds,
 } from '../services/internalNotificationService';
 import { CATEGORIES, CATEGORY_VISUALS } from '../utils/activityImages';
@@ -48,6 +49,7 @@ export default function ActivitiesPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [unreadMessageActivityIds, setUnreadMessageActivityIds] = useState<Set<string>>(new Set());
+  const [unreadPrivateMessageActivityIds, setUnreadPrivateMessageActivityIds] = useState<Set<string>>(new Set());
   const [unreadStatusActivityIds, setUnreadStatusActivityIds] = useState<Set<string>>(new Set());
   const [selectedCategory, setSelectedCategory] = useState('');
   const [zonaPrincipalFilter, setZonaPrincipalFilter] = useState('');
@@ -188,6 +190,7 @@ export default function ActivitiesPage() {
   useEffect(() => {
     if (!currentUserId || activities.length === 0) {
       setUnreadMessageActivityIds(new Set());
+      setUnreadPrivateMessageActivityIds(new Set());
       setUnreadStatusActivityIds(new Set());
       return;
     }
@@ -201,17 +204,20 @@ export default function ActivitiesPage() {
 
     async function loadUnreadMessages() {
       try {
-        const [activityIds, statusActivityIds] = await Promise.all([
+        const [activityIds, privateActivityIds, statusActivityIds] = await Promise.all([
           fetchUnreadMessageActivityIds(),
+          fetchUnreadPrivateMessageActivityIds(),
           fetchUnreadStatusActivityIds(),
         ]);
         if (isMounted) {
           setUnreadMessageActivityIds(new Set(activityIds.filter((id) => visibleActivityIds.has(id))));
+          setUnreadPrivateMessageActivityIds(new Set(privateActivityIds.filter((id) => visibleActivityIds.has(id))));
           setUnreadStatusActivityIds(new Set(statusActivityIds.filter((id) => visibleActivityIds.has(id))));
         }
       } catch {
         if (isMounted) {
           setUnreadMessageActivityIds(new Set());
+          setUnreadPrivateMessageActivityIds(new Set());
           setUnreadStatusActivityIds(new Set());
         }
       }
@@ -336,6 +342,8 @@ export default function ActivitiesPage() {
         )}
         <div className="activity-grid">
           {activities.map((activity) => {
+            const hasGeneralUnreadMessages = unreadMessageActivityIds.has(activity._id);
+            const hasPrivateUnreadMessages = unreadPrivateMessageActivityIds.has(activity._id);
             const hasCreatorUpdates = Boolean(
               currentUserId &&
               isActivityCreator(activity, currentUserId) &&
@@ -360,7 +368,8 @@ export default function ActivitiesPage() {
                 isCreator={Boolean(currentUserId && isActivityCreator(activity, currentUserId))}
                 isRemoved={Boolean(currentUserId && isUserRemovedFromActivity(activity, currentUserId))}
                 hasActivityUpdates={hasCreatorUpdates}
-                hasUnreadMessages={unreadMessageActivityIds.has(activity._id)}
+                hasUnreadMessages={hasGeneralUnreadMessages || hasPrivateUnreadMessages}
+                unreadMessagesPath={hasGeneralUnreadMessages ? `/activities/${activity._id}/chat` : '/messages'}
                 leftUsersCount={0}
                 estado={activity.estado}
                 isSaved={savedActivityIds.has(activity._id)}

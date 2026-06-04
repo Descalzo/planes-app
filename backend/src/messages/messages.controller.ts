@@ -44,4 +44,15 @@ export class MessagesController {
   ) {
     return this.messagesService.markUserActiveInGeneralChat(activityId, user.id);
   }
+
+  @Patch('inactive')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiParam({ name: 'activityId', description: 'ID de la actividad', type: String })
+  markInactive(
+    @Param('activityId', ParseObjectIdPipe) activityId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.messagesService.markUserInactiveInGeneralChat(activityId, user.id);
+  }
 }

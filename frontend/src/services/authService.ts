@@ -1,4 +1,5 @@
 import { api, setAuthToken } from './api';
+import { disconnectSocket } from './socketService';
 
 export interface RegisterDto {
   email: string;
@@ -80,6 +81,7 @@ export async function fetchUserPublicProfile(userId: string, activityId?: string
 
 export async function authenticate(payload: LoginDto) {
   const response = await loginUser(payload);
+  disconnectSocket();
   setAuthToken(response.data.access_token);
   return response.data;
 }

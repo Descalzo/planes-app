@@ -4,8 +4,8 @@ import MessageInput from '../components/MessageInput';
 import MessageList from '../components/MessageList';
 import { Activity, fetchActivity, isActivityCreator, isUserInActivity } from '../services/activityService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
-import { fetchMessages, Message, markGeneralChatActive } from '../services/messageService';
-import { markMessagesReadByActivity } from '../services/internalNotificationService';
+import { fetchMessages, Message, markGeneralChatActive, markGeneralChatInactive } from '../services/messageService';
+import { markGeneralMessagesReadByActivity } from '../services/internalNotificationService';
 import { markChatSeen, markChatSeenNow } from '../services/notificationService';
 import { getSocket } from '../services/socketService';
 import { isActivityArchived } from '../utils/activityLifecycle';
@@ -70,7 +70,7 @@ export default function ActivityChatPage() {
   // Mark notifications as read + keep active ping (suppresses push notifications)
   useEffect(() => {
     if (!currentActivityId || !canWriteChat) return;
-    markMessagesReadByActivity(currentActivityId).catch(() => {});
+    markGeneralMessagesReadByActivity(currentActivityId).catch(() => {});
     markChatSeenNow(currentActivityId, currentUserId);
     window.dispatchEvent(new Event('planes:messages-changed'));
 
@@ -80,7 +80,11 @@ export default function ActivityChatPage() {
     }
     pingActive();
     const intervalId = window.setInterval(pingActive, 8000);
-    return () => { isMounted = false; window.clearInterval(intervalId); };
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+      markGeneralChatInactive(currentActivityId).catch(() => {});
+    };
   }, [currentActivityId, currentUserId, canWriteChat]);
 
   // WebSocket setup — runs after access is confirmed
@@ -94,7 +98,7 @@ export default function ActivityChatPage() {
       seenIds.current.add(message._id);
       setMessages((prev) => [...prev, message]);
       markChatSeenNow(currentActivityId, currentUserId);
-      markMessagesReadByActivity(currentActivityId).catch(() => {});
+      markGeneralMessagesReadByActivity(currentActivityId).catch(() => {});
       window.dispatchEvent(new Event('planes:messages-changed'));
     }
 
@@ -115,6 +119,7 @@ export default function ActivityChatPage() {
 
     return () => {
       socket.emit('leaveActivityChat', { activityId: currentActivityId });
+      markGeneralChatInactive(currentActivityId).catch(() => {});
       socket.off('newActivityMessage', onNewMessage);
       socket.off('connect', joinRoom);
       socket.off('disconnect');

@@ -24,6 +24,13 @@ export async function fetchNotifications(limit = 30) {
   return response.data;
 }
 
+export async function fetchUnreadMessageNotifications(limit = 100) {
+  const response = await api.get<InternalNotification[]>('/notifications', {
+    params: { limit, category: 'messages', unreadOnly: 'true' },
+  });
+  return response.data;
+}
+
 export async function fetchUnreadNotificationsCount() {
   const response = await api.get<{ count: number }>('/notifications/unread-count');
   return response.data.count;
@@ -42,6 +49,21 @@ export async function fetchUnreadMessagesCount() {
 export async function fetchUnreadMessageActivityIds() {
   const response = await api.get<{ activityIds: string[] }>('/notifications/unread-message-activity-ids');
   return response.data.activityIds;
+}
+
+export async function fetchUnreadPrivateMessageActivityIds() {
+  const notifications = await fetchUnreadMessageNotifications(100);
+  const activityIds = notifications
+    .filter((notification) => notification.type === 'private_activity_message')
+    .map((notification) => {
+      if (!notification.activity) return null;
+      return typeof notification.activity === 'string'
+        ? notification.activity
+        : notification.activity._id ?? notification.activity.id ?? null;
+    })
+    .filter((activityId): activityId is string => Boolean(activityId));
+
+  return [...new Set(activityIds)];
 }
 
 export async function fetchUnreadStatusActivityIds() {
@@ -67,6 +89,22 @@ export async function fetchUnreadPrivateMessageActorIds(activityId: string) {
 
 export async function markMessagesReadByActivity(activityId: string) {
   await api.patch(`/notifications/messages/read-by-activity/${activityId}`, {});
+}
+
+export async function markAllMessagesRead() {
+  await api.patch('/notifications/messages/mark-all-read', {});
+}
+
+export async function markGeneralMessagesReadByActivity(activityId: string) {
+  await api.patch(`/notifications/messages/read-by-activity/${activityId}`, {}, {
+    params: { type: 'general' },
+  });
+}
+
+export async function markPrivateMessagesReadByActivityAndActor(activityId: string, actorId: string) {
+  await api.patch(`/notifications/messages/read-by-activity/${activityId}`, {}, {
+    params: { type: 'private', actorId },
+  });
 }
 
 export async function markAllStatusRead() {

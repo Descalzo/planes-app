@@ -33,3 +33,7 @@ export async function createMessage(activityId: string, payload: MessageCreateDt
 export async function markGeneralChatActive(activityId: string) {
   await api.patch(`/activities/${activityId}/messages/active`, {});
 }
+
+export async function markGeneralChatInactive(activityId: string) {
+  await api.patch(`/activities/${activityId}/messages/inactive`, {});
+}

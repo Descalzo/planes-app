@@ -16,6 +16,7 @@ import {
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
 import {
   fetchUnreadMessageActivityIds,
+  fetchUnreadPrivateMessageActivityIds,
   fetchUnreadStatusActivityIds,
 } from '../services/internalNotificationService';
 import {
@@ -41,6 +42,7 @@ export default function MyActivitiesPage() {
   const [savedActivityIds, setSavedActivityIds] = useState<Set<string>>(new Set());
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [unreadMessageActivityIds, setUnreadMessageActivityIds] = useState<Set<string>>(new Set());
+  const [unreadPrivateMessageActivityIds, setUnreadPrivateMessageActivityIds] = useState<Set<string>>(new Set());
   const [unreadStatusActivityIds, setUnreadStatusActivityIds] = useState<Set<string>>(new Set());
   const [view, setView] = useState<View>('unidas');
   const [isLoading, setIsLoading] = useState(true);
@@ -138,6 +140,7 @@ export default function MyActivitiesPage() {
   useEffect(() => {
     if (!currentUserId || chatActivities.length === 0) {
       setUnreadMessageActivityIds(new Set());
+      setUnreadPrivateMessageActivityIds(new Set());
       setUnreadStatusActivityIds(new Set());
       return;
     }
@@ -147,17 +150,20 @@ export default function MyActivitiesPage() {
 
     async function loadUnreadMessages() {
       try {
-        const [activityIds, statusActivityIds] = await Promise.all([
+        const [activityIds, privateActivityIds, statusActivityIds] = await Promise.all([
           fetchUnreadMessageActivityIds(),
+          fetchUnreadPrivateMessageActivityIds(),
           fetchUnreadStatusActivityIds(),
         ]);
         if (isMounted) {
           setUnreadMessageActivityIds(new Set(activityIds.filter((id) => visibleChatActivityIds.has(id))));
+          setUnreadPrivateMessageActivityIds(new Set(privateActivityIds.filter((id) => visibleChatActivityIds.has(id))));
           setUnreadStatusActivityIds(new Set(statusActivityIds.filter((id) => visibleChatActivityIds.has(id))));
         }
       } catch {
         if (isMounted) {
           setUnreadMessageActivityIds(new Set());
+          setUnreadPrivateMessageActivityIds(new Set());
           setUnreadStatusActivityIds(new Set());
         }
       }
@@ -243,6 +249,8 @@ export default function MyActivitiesPage() {
         )}
         {!isLoading && !error && visibleActivities.length > 0 && (() => {
           const renderCard = (activity: Activity, isFinished = false) => {
+            const hasGeneralUnreadMessages = unreadMessageActivityIds.has(activity._id);
+            const hasPrivateUnreadMessages = unreadPrivateMessageActivityIds.has(activity._id);
             const hasCreatorUpdates = Boolean(
               currentUserId &&
               isActivityCreator(activity, currentUserId) &&
@@ -273,7 +281,8 @@ export default function MyActivitiesPage() {
                 isCreator={Boolean(currentUserId && isActivityCreator(activity, currentUserId))}
                 requestStatus={isFinished ? undefined : requestStatus}
                 hasActivityUpdates={!isFinished && hasCreatorUpdates}
-                hasUnreadMessages={unreadMessageActivityIds.has(activity._id)}
+                hasUnreadMessages={hasGeneralUnreadMessages || hasPrivateUnreadMessages}
+                unreadMessagesPath={hasGeneralUnreadMessages ? `/activities/${activity._id}/chat` : '/messages'}
                 leftUsersCount={0}
                 isSaved={savedActivityIds.has(activity._id)}
                 privateChatUserId={!isFinished && requestStatus && currentUserId ? currentUserId : undefined}

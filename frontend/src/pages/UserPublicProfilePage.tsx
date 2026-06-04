@@ -47,9 +47,16 @@ export default function UserPublicProfilePage() {
         setProfile(profileData);
         setError(null);
       } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'No se pudo cargar el perfil';
-        setError(errorMsg);
-        console.error(err);
+        const response = typeof err === 'object' && err && 'response' in err
+          ? (err as { response?: { status?: number } }).response
+          : undefined;
+        if (response?.status === 404) {
+          setError('Este usuario ya no está con nosotros.');
+        } else if (response?.status === 403) {
+          setError('No tienes permiso para ver este perfil.');
+        } else {
+          setError('No se pudo cargar el perfil.');
+        }
       } finally {
         setIsLoading(false);
       }

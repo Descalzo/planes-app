@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  fetchNotifications,
+  fetchUnreadMessagesCount,
+  fetchUnreadMessageNotifications,
   InternalNotification,
-  markMessagesReadByActivity,
+  markAllMessagesRead,
+  markGeneralMessagesReadByActivity,
   markNotificationAsRead,
+  markPrivateMessagesReadByActivityAndActor,
 } from '../services/internalNotificationService';
 import { CurrentUser, fetchCurrentUser } from '../services/authService';
 import { markChatSeenNow, markPrivateChatSeen } from '../services/notificationService';
@@ -69,6 +72,7 @@ export default function MessagesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [markingId, setMarkingId] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
 
@@ -77,10 +81,15 @@ export default function MessagesPage() {
 
     async function load() {
       try {
-        const [data, user] = await Promise.all([fetchNotifications(), fetchCurrentUser()]);
+        const [data, user, count] = await Promise.all([
+          fetchUnreadMessageNotifications(),
+          fetchCurrentUser(),
+          fetchUnreadMessagesCount(),
+        ]);
         if (isMounted) {
           setNotifications(data.filter(isMessageNotification).filter((n) => !n.readAt));
           setCurrentUser(user);
+          setUnreadCount(count);
           setError(null);
         }
       } catch {
@@ -111,9 +120,19 @@ export default function MessagesPage() {
     setError(null);
 
     try {
-      await markMessagesReadByActivity(activityId);
+      if (notification.type === 'private_activity_message') {
+        const actorId = getActorId(notification);
+        if (actorId) {
+          await markPrivateMessagesReadByActivityAndActor(activityId, actorId);
+        } else {
+          await markNotificationAsRead(notification._id);
+        }
+      } else {
+        await markGeneralMessagesReadByActivity(activityId);
+      }
       markMessageNotificationSeenLocally(notification, activityId, currentUserId);
       setNotifications((current) => current.filter((n) => n._id !== notification._id));
+      setUnreadCount((count) => Math.max(0, count - 1));
       window.dispatchEvent(new Event('planes:messages-changed'));
       navigate(getChatPath(notification, activityId, currentUserId));
     } catch {
@@ -134,9 +153,25 @@ export default function MessagesPage() {
         markMessageNotificationSeenLocally(notification, activityId, currentUserId);
       }
       setNotifications((current) => current.filter((n) => n._id !== notification._id));
+      setUnreadCount((count) => Math.max(0, count - 1));
       window.dispatchEvent(new Event('planes:messages-changed'));
     } catch {
       setError('No se pudo marcar el mensaje como leido');
+    } finally {
+      setMarkingId(null);
+    }
+  }
+
+  async function handleMarkAllAsRead() {
+    setMarkingId('all');
+    setError(null);
+    try {
+      await markAllMessagesRead();
+      setNotifications([]);
+      setUnreadCount(0);
+      window.dispatchEvent(new Event('planes:messages-changed'));
+    } catch {
+      setError('No se pudieron marcar todos los mensajes como leidos');
     } finally {
       setMarkingId(null);
     }
@@ -149,13 +184,23 @@ export default function MessagesPage() {
           <h1>Mensajes</h1>
           <p>Chat general y mensajes privados de tus actividades.</p>
         </div>
+        {unreadCount > 0 && (
+          <button
+            className="button button--secondary button--small"
+            type="button"
+            disabled={markingId === 'all'}
+            onClick={handleMarkAllAsRead}
+          >
+            {markingId === 'all' ? 'Guardando...' : 'Marcar todos leidos'}
+          </button>
+        )}
       </header>
 
       <section className="notifications-list">
         {isLoading && <p>Cargando mensajes...</p>}
         {error && <p role="alert">{error}</p>}
         {!isLoading && !error && notifications.length === 0 && (
-          <p>No tienes mensajes nuevos.</p>
+          <p>{unreadCount > 0 ? 'Hay mensajes antiguos pendientes de limpiar.' : 'No tienes mensajes nuevos.'}</p>
         )}
         {notifications.map((notification) => {
           const activityId = getActivityId(notification);

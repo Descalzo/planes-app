@@ -53,4 +53,15 @@ export class PrivateActivityMessagesController {
   ) {
     return this.privateMessagesService.markConversationActive(activityId, userId, user.id);
   }
+
+  @Patch(':userId/inactive')
+  @ApiParam({ name: 'activityId', description: 'ID de la actividad', type: String })
+  @ApiParam({ name: 'userId', description: 'ID del usuario interesado', type: String })
+  markInactive(
+    @Param('activityId', ParseObjectIdPipe) activityId: string,
+    @Param('userId', ParseObjectIdPipe) userId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.privateMessagesService.markConversationInactive(activityId, userId, user.id);
+  }
 }

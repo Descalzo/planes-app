@@ -35,6 +35,11 @@ export class MessagesService {
     return { ok: true };
   }
 
+  async markUserInactiveInGeneralChat(activityId: string, userId: string) {
+    this.activeGeneralChatKeys.delete(`${activityId}:${userId}`);
+    return { ok: true };
+  }
+
   async create(activityId: string, userId: string, createMessageDto: CreateMessageDto): Promise<Message> {
     const activity = await this.activityModel.findById(activityId).exec();
     if (!activity) {
@@ -71,16 +76,14 @@ export class MessagesService {
     ];
     const recipients = allParticipants.filter((id) => id !== userId);
 
-    const senderName = (author as any).nombre ?? (author as any).email ?? 'Un usuario';
-
     for (const recipientId of recipients) {
       if (!this.isUserActiveInGeneralChat(activityId, recipientId)) {
-        await this.notificationsService.create({
+        await this.notificationsService.createOrUpdateUnreadMessage({
           recipientId,
           actorId: userId,
           activityId,
           type: 'general_chat_message',
-          message: `${senderName} ha enviado un mensaje en ${activity.titulo}`,
+          message: `Hay mensajes nuevos en ${activity.titulo}`,
         });
       }
     }

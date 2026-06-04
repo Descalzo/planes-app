@@ -23,16 +23,12 @@ import {
   unmuteActivityParticipant,
   unsaveActivity,
 } from '../services/activityService';
-import { CurrentUser, fetchCurrentUser } from '../services/authService';
+import { CurrentUser, fetchCurrentUser, fetchUserPublicProfile } from '../services/authService';
 import {
   fetchUnreadPrivateMessageActorIds,
   markStatusNotificationsReadByActivity,
 } from '../services/internalNotificationService';
 import { markActivitySeen } from '../services/notificationService';
-import {
-  fetchPrivateActivityConversations,
-  PrivateActivityConversation,
-} from '../services/privateActivityChatService';
 import { hasActivityStarted, isActivityArchived } from '../utils/activityLifecycle';
 import { getCategoryVisual, getActivityImage } from '../utils/activityImages';
 import SaveMarkerIcon from '../components/SaveMarkerIcon';
@@ -51,6 +47,43 @@ function getErrorMessage(error: unknown) {
   return 'No se pudo completar la accion';
 }
 
+function getReferencePhotoUrl(reference: unknown) {
+  if (!reference || typeof reference === 'string') {
+    return null;
+  }
+
+  return (reference as { fotoPerfilUrl?: string }).fotoPerfilUrl ?? null;
+}
+
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .map((part) => part.trim()[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'U';
+}
+
+function ProfileAvatar({ reference, photoUrl }: { reference: unknown; photoUrl?: string | null }) {
+  const name = getReferenceName(reference as any);
+  const resolvedPhotoUrl = photoUrl ?? getReferencePhotoUrl(reference);
+
+  return (
+    <span className="participant-avatar" aria-hidden="true">
+      {resolvedPhotoUrl ? <img src={resolvedPhotoUrl} alt="" /> : <span>{getInitials(name)}</span>}
+    </span>
+  );
+}
+
+function ChatBubbleIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
 export default function ActivityDetailPage() {
   const { activityId } = useParams();
   const [activity, setActivity] = useState<Activity | null>(null);
@@ -63,8 +96,8 @@ export default function ActivityDetailPage() {
   const [unbanningParticipantId, setUnbanningParticipantId] = useState<string | null>(null);
   const [requestActionId, setRequestActionId] = useState<string | null>(null);
   const [openParticipantMenuId, setOpenParticipantMenuId] = useState<string | null>(null);
-  const [privateConversations, setPrivateConversations] = useState<PrivateActivityConversation[]>([]);
   const [unreadPrivateActorIds, setUnreadPrivateActorIds] = useState<Set<string>>(new Set());
+  const [profilePhotoUrls, setProfilePhotoUrls] = useState<Record<string, string>>({});
   const [isSaved, setIsSaved] = useState(false);
   const [detailImgError, setDetailImgError] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -130,8 +163,7 @@ export default function ActivityDetailPage() {
   const currentUserId = currentUser?._id ?? currentUser?.id ?? null;
 
   useEffect(() => {
-    if (!activityId || !activity || !currentUserId || !isActivityCreator(activity, currentUserId)) {
-      setPrivateConversations([]);
+    if (!activityId || !activity || !currentUserId) {
       setUnreadPrivateActorIds(new Set());
       return;
     }
@@ -139,32 +171,27 @@ export default function ActivityDetailPage() {
     const currentActivityId = activityId;
     let isMounted = true;
 
-    async function loadPrivateConversations() {
+    async function loadUnreadPrivateMessages() {
       try {
-        const [conversations, actorIds] = await Promise.all([
-          fetchPrivateActivityConversations(currentActivityId),
-          fetchUnreadPrivateMessageActorIds(currentActivityId),
-        ]);
+        const actorIds = await fetchUnreadPrivateMessageActorIds(currentActivityId);
         if (isMounted) {
-          setPrivateConversations(conversations);
           setUnreadPrivateActorIds(new Set(actorIds));
         }
       } catch {
         if (isMounted) {
-          setPrivateConversations([]);
           setUnreadPrivateActorIds(new Set());
         }
       }
     }
 
-    loadPrivateConversations();
-    const intervalId = window.setInterval(loadPrivateConversations, 10000);
-    window.addEventListener('planes:messages-changed', loadPrivateConversations);
+    loadUnreadPrivateMessages();
+    const intervalId = window.setInterval(loadUnreadPrivateMessages, 10000);
+    window.addEventListener('planes:messages-changed', loadUnreadPrivateMessages);
 
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
-      window.removeEventListener('planes:messages-changed', loadPrivateConversations);
+      window.removeEventListener('planes:messages-changed', loadUnreadPrivateMessages);
     };
   }, [activityId, activity, currentUserId]);
 
@@ -177,6 +204,58 @@ export default function ActivityDetailPage() {
     document.addEventListener('pointerdown', handleOutside);
     return () => document.removeEventListener('pointerdown', handleOutside);
   }, [openParticipantMenuId]);
+
+  useEffect(() => {
+    if (!activity || !activityId || !currentUserId) return;
+
+    const references = [
+      activity.creador,
+      ...(activity.participantes ?? []),
+      ...(activity.solicitudesPendientes ?? []),
+      ...(activity.solicitudesRechazadas ?? []),
+      ...(activity.expulsados ?? []),
+      ...(activity.salidas ?? []),
+      ...(activity.chatSilenciados ?? []),
+    ];
+
+    const missingPhotoIds = [
+      ...new Set(
+        references
+          .map((reference) => {
+            const userId = getReferenceId(reference);
+            if (!userId || getReferencePhotoUrl(reference) || profilePhotoUrls[userId]) return null;
+            return userId;
+          })
+          .filter((userId): userId is string => Boolean(userId)),
+      ),
+    ];
+
+    if (missingPhotoIds.length === 0) return;
+
+    let isMounted = true;
+    Promise.all(
+      missingPhotoIds.map(async (userId) => {
+        try {
+          const profile = await fetchUserPublicProfile(userId, activityId);
+          return profile.fotoPerfilUrl ? [userId, profile.fotoPerfilUrl] as const : null;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((entries) => {
+      if (!isMounted) return;
+      const resolvedEntries = entries.filter((entry): entry is readonly [string, string] => Boolean(entry));
+      if (resolvedEntries.length === 0) return;
+      setProfilePhotoUrls((current) => ({
+        ...current,
+        ...Object.fromEntries(resolvedEntries),
+      }));
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activity, activityId, currentUserId, profilePhotoUrls]);
 
   async function handleJoin() {
     if (!activityId) {
@@ -333,6 +412,23 @@ export default function ActivityDetailPage() {
   const pendingRequests = activity?.solicitudesPendientes ?? [];
   const mutedUsers = activity?.chatSilenciados ?? [];
 
+  function renderPrivateChatButton(userId: string, label = 'Chat', unreadActorId = userId) {
+    if (!activityId || !canUseChat || !currentUserId || (isCreator && userId === currentUserId)) return null;
+    const hasUnread = unreadPrivateActorIds.has(unreadActorId);
+
+    return (
+      <Link
+        className={`participant-chat-link${hasUnread ? ' participant-chat-link--unread' : ''}`}
+        to={`/activities/${activityId}/private-chat/${userId}`}
+        aria-label={`${label}${hasUnread ? ' con mensajes nuevos' : ''}`}
+        title={label}
+      >
+        <ChatBubbleIcon />
+        <span>{label}</span>
+      </Link>
+    );
+  }
+
   async function handleToggleSave() {
     if (!activityId) return;
     const wasSaved = isSaved;
@@ -395,16 +491,27 @@ export default function ActivityDetailPage() {
             <div className="creator-info">
               <h3>Organizador</h3>
               <div className="creator-card">
-                <div>
-                  <strong>{getReferenceName(activity.creador)}</strong>
-                </div>
-                {!isCreator && getReferenceId(activity.creador) !== currentUserId && (
-                  <Link
-                    className="button button--ghost button--small"
-                    to={`/users/${getReferenceId(activity.creador)}/profile?activityId=${activityId}`}
-                  >
-                    Ver perfil
-                  </Link>
+                {creatorId ? (
+                  <>
+                    <Link
+                      className="participant-profile-link"
+                      to={`/users/${creatorId}/profile?activityId=${activityId}`}
+                    >
+                      <span className="participant-row__info">
+                        <strong>{getReferenceName(activity.creador)}</strong>
+                        {isCreator && <span className="participant-badge">Tú</span>}
+                      </span>
+                      <ProfileAvatar reference={activity.creador} photoUrl={profilePhotoUrls[creatorId]} />
+                    </Link>
+                    {!isCreator && currentUserId && renderPrivateChatButton(currentUserId, 'Chat', creatorId)}
+                  </>
+                ) : (
+                  <div className="participant-profile-link participant-profile-link--static">
+                    <span className="participant-row__info">
+                      <strong>{getReferenceName(activity.creador)}</strong>
+                    </span>
+                    <ProfileAvatar reference={activity.creador} />
+                  </div>
                 )}
               </div>
             </div>
@@ -425,17 +532,20 @@ export default function ActivityDetailPage() {
 
                           return (
                             <div className="participant-row participant-row--request" key={userId}>
-                              <div className="participant-row__info">
-                                <strong>{getReferenceName(user)}</strong>
-                                <span className="participant-badge participant-badge--pending">Pendiente</span>
-                              </div>
-                              <div className="participant-actions">
+                              <div className="participant-request-main">
                                 <Link
-                                  className="button button--ghost button--small"
+                                  className="participant-profile-link"
                                   to={`/users/${userId}/profile?activityId=${activityId}`}
                                 >
-                                  Ver perfil
+                                  <span className="participant-row__info">
+                                    <strong>{getReferenceName(user)}</strong>
+                                    <span className="participant-badge participant-badge--pending">Pendiente</span>
+                                  </span>
+                                  <ProfileAvatar reference={user} photoUrl={profilePhotoUrls[userId]} />
                                 </Link>
+                                {renderPrivateChatButton(userId)}
+                              </div>
+                              <div className="participant-actions">
                                 <button
                                   className="button button--accept button--small"
                                   type="button"
@@ -474,20 +584,19 @@ export default function ActivityDetailPage() {
 
                       return (
                         <div className="participant-row" key={participantId}>
-                          <div className="participant-row__info">
-                            <strong>{getReferenceName(participant)}</strong>
-                            {isCurrentCreator && <span className="participant-badge">Tú · Organizador</span>}
-                            {isMuted && <span className="participant-badge participant-badge--muted">Silenciado</span>}
-                          </div>
+                          <Link
+                            className="participant-profile-link"
+                            to={`/users/${participantId}/profile?activityId=${activityId}`}
+                          >
+                            <span className="participant-row__info">
+                              <strong>{getReferenceName(participant)}</strong>
+                              {isCurrentCreator && <span className="participant-badge">Tú · Organizador</span>}
+                              {isMuted && <span className="participant-badge participant-badge--muted">Silenciado</span>}
+                            </span>
+                            <ProfileAvatar reference={participant} photoUrl={profilePhotoUrls[participantId]} />
+                          </Link>
                           <div className="participant-actions">
-                            {!isCurrentCreator && (
-                              <Link
-                                className="button button--ghost button--small"
-                                to={`/users/${participantId}/profile?activityId=${activityId}`}
-                              >
-                                Ver perfil
-                              </Link>
-                            )}
+                            {renderPrivateChatButton(participantId)}
                             {!isArchived && !isCurrentCreator && (
                               <div className="participant-more">
                                 <button
@@ -542,9 +651,18 @@ export default function ActivityDetailPage() {
 
                         return (
                           <div className="participant-row" key={userId}>
-                            <div className="participant-row__info">
-                              <strong>{getReferenceName(user)}</strong>
-                              <span className="participant-badge participant-badge--neutral">Se desapuntó</span>
+                            <Link
+                              className="participant-profile-link"
+                              to={`/users/${userId}/profile?activityId=${activityId}`}
+                            >
+                              <span className="participant-row__info">
+                                <strong>{getReferenceName(user)}</strong>
+                                <span className="participant-badge participant-badge--neutral">Se desapuntó</span>
+                              </span>
+                              <ProfileAvatar reference={user} photoUrl={profilePhotoUrls[userId]} />
+                            </Link>
+                            <div className="participant-actions">
+                              {renderPrivateChatButton(userId)}
                             </div>
                           </div>
                         );
@@ -564,20 +682,29 @@ export default function ActivityDetailPage() {
 
                         return (
                           <div className="participant-row" key={userId}>
-                            <div className="participant-row__info">
-                              <strong>{getReferenceName(user)}</strong>
-                              <span className="participant-badge participant-badge--muted">Silenciado del chat</span>
+                            <Link
+                              className="participant-profile-link"
+                              to={`/users/${userId}/profile?activityId=${activityId}`}
+                            >
+                              <span className="participant-row__info">
+                                <strong>{getReferenceName(user)}</strong>
+                                <span className="participant-badge participant-badge--muted">Silenciado del chat</span>
+                              </span>
+                              <ProfileAvatar reference={user} photoUrl={profilePhotoUrls[userId]} />
+                            </Link>
+                            <div className="participant-actions">
+                              {renderPrivateChatButton(userId)}
+                              {!isArchived && (
+                                <button
+                                  className="button button--ghost button--small"
+                                  type="button"
+                                  disabled={mutingParticipantId === userId}
+                                  onClick={() => handleToggleMute(userId, true)}
+                                >
+                                  {mutingParticipantId === userId ? 'Guardando...' : 'Permitir hablar'}
+                                </button>
+                              )}
                             </div>
-                            {!isArchived && (
-                              <button
-                                className="button button--ghost button--small"
-                                type="button"
-                                disabled={mutingParticipantId === userId}
-                                onClick={() => handleToggleMute(userId, true)}
-                              >
-                                {mutingParticipantId === userId ? 'Guardando...' : 'Permitir hablar'}
-                              </button>
-                            )}
                           </div>
                         );
                       })}
@@ -596,20 +723,29 @@ export default function ActivityDetailPage() {
 
                         return (
                           <div className="participant-row" key={userId}>
-                            <div className="participant-row__info">
-                              <strong>{getReferenceName(user)}</strong>
-                              <span className="participant-badge participant-badge--danger">Expulsado</span>
+                            <Link
+                              className="participant-profile-link"
+                              to={`/users/${userId}/profile?activityId=${activityId}`}
+                            >
+                              <span className="participant-row__info">
+                                <strong>{getReferenceName(user)}</strong>
+                                <span className="participant-badge participant-badge--danger">Expulsado</span>
+                              </span>
+                              <ProfileAvatar reference={user} photoUrl={profilePhotoUrls[userId]} />
+                            </Link>
+                            <div className="participant-actions">
+                              {renderPrivateChatButton(userId)}
+                              {!isArchived && (
+                                <button
+                                  className="button button--ghost button--small"
+                                  type="button"
+                                  disabled={unbanningParticipantId === userId}
+                                  onClick={() => handleUnban(userId)}
+                                >
+                                  {unbanningParticipantId === userId ? 'Desbaneando...' : 'Desbanear'}
+                                </button>
+                              )}
                             </div>
-                            {!isArchived && (
-                              <button
-                                className="button button--ghost button--small"
-                                type="button"
-                                disabled={unbanningParticipantId === userId}
-                                onClick={() => handleUnban(userId)}
-                              >
-                                {unbanningParticipantId === userId ? 'Desbaneando...' : 'Desbanear'}
-                              </button>
-                            )}
                           </div>
                         );
                       })}
@@ -632,17 +768,15 @@ export default function ActivityDetailPage() {
 
                       return (
                         <div className="participant-row" key={participantId}>
-                          <div>
-                            <strong>{getReferenceName(participant)}</strong>
-                          </div>
-                          {participantId !== currentUserId && (
-                            <Link
-                              className="button button--ghost button--small"
-                              to={`/users/${participantId}/profile?activityId=${activityId}`}
-                            >
-                              Ver perfil
-                            </Link>
-                          )}
+                          <Link
+                            className="participant-profile-link"
+                            to={`/users/${participantId}/profile?activityId=${activityId}`}
+                          >
+                            <span className="participant-row__info">
+                              <strong>{getReferenceName(participant)}</strong>
+                            </span>
+                            <ProfileAvatar reference={participant} photoUrl={profilePhotoUrls[participantId]} />
+                          </Link>
                         </div>
                       );
                     })}
@@ -659,11 +793,6 @@ export default function ActivityDetailPage() {
               ) : isPending ? (
                 <>
                   <p className="status-pill">Solicitud pendiente de aprobacion</p>
-                  {currentUserId && activityId && (
-                    <Link className="button button--ghost" to={`/activities/${activityId}/private-chat/${currentUserId}`}>
-                      Preguntar al organizador
-                    </Link>
-                  )}
                 </>
               ) : isRejected ? (
                 <>
@@ -675,11 +804,6 @@ export default function ActivityDetailPage() {
                       {isJoining ? 'Solicitando...' : 'Solicitar de nuevo'}
                     </button>
                   )}
-                  {currentUserId && activityId && (
-                    <Link className="button button--ghost" to={`/activities/${activityId}/private-chat/${currentUserId}`}>
-                    Preguntar al organizador
-                    </Link>
-                  )}
                 </>
               ) : isJoined ? (
                 <>
@@ -689,47 +813,21 @@ export default function ActivityDetailPage() {
                       {isLeaving ? 'Saliendo...' : 'Desapuntarme'}
                     </button>
                   )}
-                  {!isCreator && currentUserId && activityId && (
-                    <Link className="button button--ghost" to={`/activities/${activityId}/private-chat/${currentUserId}`}>
-                      Preguntar al organizador
-                    </Link>
-                  )}
                 </>
               ) : isFull ? (
                 <>
                   <p className="status-pill status-pill--danger">Actividad completa</p>
-                  {currentUserId && activityId && (
-                    <Link className="button button--ghost" to={`/activities/${activityId}/private-chat/${currentUserId}`}>
-                      Preguntar al organizador
-                    </Link>
-                  )}
                 </>
               ) : (
                 <>
                   <button className="button button--primary" type="button" onClick={handleJoin} disabled={isJoining}>
                     {isJoining ? 'Solicitando...' : 'Solicitar plaza'}
                   </button>
-                  {currentUserId && activityId && (
-                    <Link className="button button--ghost" to={`/activities/${activityId}/private-chat/${currentUserId}`}>
-                      Preguntar al organizador
-                    </Link>
-                  )}
                 </>
               )}
               {!hasStarted && isCreator && activityId && (
                 <Link className="button button--primary detail-actions__primary" to={`/activities/${activityId}/edit`}>
                   Editar
-                </Link>
-              )}
-              {!hasStarted && isCreator && activityId && (
-                <Link
-                  className={`button button--ghost detail-actions__secondary${unreadPrivateActorIds.size > 0 ? ' button--has-badge' : ''}`}
-                  to={`/activities/${activityId}/conversations`}
-                >
-                  {unreadPrivateActorIds.size > 0 && (
-                    <span className="button-badge" aria-label="Mensajes nuevos">●</span>
-                  )}
-                  Consultas privadas{privateConversations.length > 0 ? ` (${privateConversations.length})` : ''}
                 </Link>
               )}
               {canUseChat && activityId && (isCreator || isJoined) && (

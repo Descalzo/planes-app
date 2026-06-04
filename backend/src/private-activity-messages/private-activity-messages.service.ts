@@ -31,8 +31,14 @@ export class PrivateActivityMessagesService {
     return activity;
   }
 
-  private isUserActiveInConversation(activityId: string, userId: string) {
-    const lastSeen = this.activeConversationKeys.get(`${activityId}:${userId}`);
+  private getActiveConversationKey(activityId: string, viewerId: string, otherUserId: string) {
+    return `${activityId}:${viewerId}:${otherUserId}`;
+  }
+
+  private isViewerActiveInConversation(activityId: string, viewerId: string, otherUserId: string) {
+    const lastSeen = this.activeConversationKeys.get(
+      this.getActiveConversationKey(activityId, viewerId, otherUserId),
+    );
     return Boolean(lastSeen && Date.now() - lastSeen < 15000);
   }
 
@@ -137,13 +143,13 @@ export class PrivateActivityMessagesService {
     });
     const savedMessage = await message.save();
 
-    if (!this.isUserActiveInConversation(activityId, receiverId)) {
-      await this.notificationsService.create({
+    if (!this.isViewerActiveInConversation(activityId, receiverId, requesterId)) {
+      await this.notificationsService.createOrUpdateUnreadMessage({
         recipientId: receiverId,
         actorId: requesterId,
         activityId,
         type: 'private_activity_message',
-        message: `${requester.nombre ?? requester.email ?? 'Un usuario'} te ha enviado un mensaje privado sobre ${activity.titulo}`,
+        message: `${requester.nombre ?? requester.email ?? 'Un usuario'} te ha enviado mensajes privados sobre ${activity.titulo}`,
       });
     }
 
@@ -170,8 +176,16 @@ export class PrivateActivityMessagesService {
 
   async markConversationActive(activityId: string, userId: string, requesterId: string) {
     await this.getActivity(activityId);
-    // Marca al SOLICITANTE (quien está viendo) como activo, no a la conversación entera
-    this.activeConversationKeys.set(`${activityId}:${requesterId}`, Date.now());
+    // Marks the viewer as active only in this exact private conversation.
+    this.activeConversationKeys.set(
+      this.getActiveConversationKey(activityId, requesterId, userId),
+      Date.now(),
+    );
+    return { ok: true };
+  }
+
+  async markConversationInactive(activityId: string, userId: string, requesterId: string) {
+    this.activeConversationKeys.delete(this.getActiveConversationKey(activityId, requesterId, userId));
     return { ok: true };
   }
 }

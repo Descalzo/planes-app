@@ -70,7 +70,7 @@ export class ActivitiesService {
 
     const users = await this.userModel
       .find({ _id: { $in: [...userIds].map((id) => new Types.ObjectId(id)) } })
-      .select('nombre email ciudad')
+      .select('nombre email ciudad fotoPerfilUrl')
       .lean()
       .exec();
     const usersById = new Map(users.map((user) => [user._id.toString(), user]));

@@ -227,7 +227,7 @@ export class UsersService {
 
     const users = await this.userModel
       .find({ _id: { $in: [...userIds].map((id) => new Types.ObjectId(id)) } })
-      .select('nombre email ciudad')
+      .select('nombre email ciudad fotoPerfilUrl')
       .lean()
       .exec();
     const usersById = new Map(users.map((user) => [user._id.toString(), user]));
@@ -293,6 +293,7 @@ export class UsersService {
     const requestIdObj = requesterId ? new Types.ObjectId(requesterId) : null;
     const isCreator = activity.creador.toString() === userId;
     const isParticipant = (activity.participantes ?? []).some((p: Types.ObjectId) => p.toString() === userId);
+    const isFormerParticipant = (activity.salidas ?? []).some((p: Types.ObjectId) => p.toString() === userId);
     const isPendingRequest = (activity.solicitudesPendientes ?? []).some(
       (p: Types.ObjectId) => p.toString() === userId,
     );
@@ -303,7 +304,7 @@ export class UsersService {
     }
 
     // Caso 2: Si el usuario solicitado es participante
-    if (isParticipant) {
+    if (isParticipant || isFormerParticipant) {
       // Si no hay requesterId, no puede ver (debe estar autenticado)
       if (!requestIdObj) {
         throw new ForbiddenException('Acceso denegado al perfil público');

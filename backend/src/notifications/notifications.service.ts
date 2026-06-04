@@ -29,6 +29,42 @@ export class NotificationsService {
     return notification.save();
   }
 
+  async createOrUpdateUnreadMessage(input: CreateNotificationInput) {
+    const filter: Record<string, unknown> = {
+      recipient: new Types.ObjectId(input.recipientId),
+      activity: input.activityId ? new Types.ObjectId(input.activityId) : undefined,
+      type: input.type,
+      readAt: { $exists: false },
+    };
+
+    if (input.type === 'private_activity_message') {
+      filter.actor = input.actorId ? new Types.ObjectId(input.actorId) : undefined;
+    }
+
+    const existingNotifications = await this.notificationModel
+      .find(filter)
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .exec();
+    const existing = existingNotifications[0];
+
+    if (existing) {
+      if (input.actorId) {
+        existing.actor = new Types.ObjectId(input.actorId);
+      }
+      existing.message = input.message;
+      const duplicateIds = existingNotifications.slice(1).map((notification) => notification._id);
+      if (duplicateIds.length > 0) {
+        await this.notificationModel.updateMany(
+          { _id: { $in: duplicateIds } },
+          { $set: { readAt: new Date() } },
+        );
+      }
+      return existing.save();
+    }
+
+    return this.create(input);
+  }
+
   private getLimit(limit?: string) {
     const parsed = Number(limit);
     if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -38,9 +74,27 @@ export class NotificationsService {
     return Math.min(Math.floor(parsed), 100);
   }
 
-  async findForUser(userId: string, limit?: string) {
+  private getMessageTypes(): NotificationType[] {
+    return ['private_activity_message', 'general_chat_message'];
+  }
+
+  async findForUser(userId: string, limit?: string, category?: string, unreadOnly?: string) {
+    const filter: Record<string, unknown> = {
+      recipient: new Types.ObjectId(userId),
+    };
+
+    if (category === 'messages') {
+      filter.type = { $in: this.getMessageTypes() };
+    } else if (category === 'status') {
+      filter.type = { $nin: this.getMessageTypes() };
+    }
+
+    if (unreadOnly === 'true') {
+      filter.readAt = { $exists: false };
+    }
+
     return this.notificationModel
-      .find({ recipient: new Types.ObjectId(userId) })
+      .find(filter)
       .sort({ createdAt: -1 })
       .limit(this.getLimit(limit))
       .populate('actor', 'nombre email ciudad')
@@ -52,7 +106,7 @@ export class NotificationsService {
     return this.notificationModel.countDocuments({
       recipient: new Types.ObjectId(userId),
       readAt: { $exists: false },
-      type: { $nin: ['private_activity_message', 'general_chat_message'] },
+      type: { $nin: this.getMessageTypes() },
     });
   }
 
@@ -60,7 +114,7 @@ export class NotificationsService {
     return this.notificationModel.countDocuments({
       recipient: new Types.ObjectId(userId),
       readAt: { $exists: false },
-      type: { $in: ['private_activity_message', 'general_chat_message'] },
+      type: { $in: this.getMessageTypes() },
     });
   }
 
@@ -69,6 +123,17 @@ export class NotificationsService {
       recipient: new Types.ObjectId(userId),
       readAt: { $exists: false },
       type: 'general_chat_message',
+      activity: { $exists: true, $ne: null },
+    });
+
+    return activityIds.map((activityId) => activityId.toString());
+  }
+
+  async getUnreadPrivateMessageActivityIds(userId: string) {
+    const activityIds = await this.notificationModel.distinct('activity', {
+      recipient: new Types.ObjectId(userId),
+      readAt: { $exists: false },
+      type: 'private_activity_message',
       activity: { $exists: true, $ne: null },
     });
 
@@ -103,7 +168,43 @@ export class NotificationsService {
       {
         recipient: new Types.ObjectId(userId),
         activity: new Types.ObjectId(activityId),
-        type: { $in: ['private_activity_message', 'general_chat_message'] },
+        type: { $in: this.getMessageTypes() },
+        readAt: { $exists: false },
+      },
+      { $set: { readAt: new Date() } },
+    );
+  }
+
+  async markAllMessagesRead(userId: string) {
+    await this.notificationModel.updateMany(
+      {
+        recipient: new Types.ObjectId(userId),
+        type: { $in: this.getMessageTypes() },
+        readAt: { $exists: false },
+      },
+      { $set: { readAt: new Date() } },
+    );
+  }
+
+  async markGeneralMessagesReadByActivity(activityId: string, userId: string) {
+    await this.notificationModel.updateMany(
+      {
+        recipient: new Types.ObjectId(userId),
+        activity: new Types.ObjectId(activityId),
+        type: 'general_chat_message',
+        readAt: { $exists: false },
+      },
+      { $set: { readAt: new Date() } },
+    );
+  }
+
+  async markPrivateMessagesReadByActivityAndActor(activityId: string, userId: string, actorId: string) {
+    await this.notificationModel.updateMany(
+      {
+        recipient: new Types.ObjectId(userId),
+        actor: new Types.ObjectId(actorId),
+        activity: new Types.ObjectId(activityId),
+        type: 'private_activity_message',
         readAt: { $exists: false },
       },
       { $set: { readAt: new Date() } },
@@ -114,7 +215,7 @@ export class NotificationsService {
     await this.notificationModel.updateMany(
       {
         recipient: new Types.ObjectId(userId),
-        type: { $nin: ['private_activity_message', 'general_chat_message'] },
+        type: { $nin: this.getMessageTypes() },
         readAt: { $exists: false },
       },
       { $set: { readAt: new Date() } },
@@ -126,7 +227,7 @@ export class NotificationsService {
       {
         recipient: new Types.ObjectId(userId),
         activity: new Types.ObjectId(activityId),
-        type: { $nin: ['private_activity_message', 'general_chat_message'] },
+        type: { $nin: this.getMessageTypes() },
         readAt: { $exists: false },
       },
       { $set: { readAt: new Date() } },

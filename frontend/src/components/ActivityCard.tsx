@@ -22,6 +22,7 @@ interface ActivityCardProps {
   requestStatus?: 'pending' | 'rejected';
   hasActivityUpdates?: boolean;
   hasUnreadMessages?: boolean;
+  unreadMessagesPath?: string;
   leftUsersCount?: number;
   isSaved?: boolean;
   privateChatUserId?: string;
@@ -48,6 +49,7 @@ export default function ActivityCard({
   requestStatus,
   hasActivityUpdates = false,
   hasUnreadMessages = false,
+  unreadMessagesPath,
   leftUsersCount = 0,
   isSaved = false,
   privateChatUserId,
@@ -138,7 +140,11 @@ export default function ActivityCard({
             {isRemoved && <span>Ya no formas parte de esta actividad</span>}
             {leftUsersCount > 0 && <span>{leftUsersCount} se desapuntaron</span>}
             {hasActivityUpdates && <Link className="activity-card__notice-link" to={`/activities/${id}`}>Novedades en tu actividad</Link>}
-            {hasUnreadMessages && <Link className="activity-card__notice-link" to={`/activities/${id}/chat`}>Mensajes nuevos</Link>}
+            {hasUnreadMessages && (
+              <Link className="activity-card__notice-link" to={unreadMessagesPath ?? `/activities/${id}/chat`}>
+                Mensajes nuevos
+              </Link>
+            )}
           </div>
         )}
         <h2><Link className="activity-card__title-link" to={`/activities/${id}`}>{title}</Link></h2>

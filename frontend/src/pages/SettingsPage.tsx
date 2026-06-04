@@ -2,6 +2,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useTheme, ThemePreference } from '../hooks/useTheme';
 import { useSettings } from '../hooks/useSettings';
 import { setAuthToken } from '../services/api';
+import { disconnectSocket } from '../services/socketService';
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; hint: string }[] = [
   { value: 'auto', label: 'Auto', hint: 'Sigue el sistema' },
@@ -43,6 +44,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
 
   function handleLogout() {
+    disconnectSocket();
     setAuthToken(null);
     navigate('/login', { replace: true });
   }

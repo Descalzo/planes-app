@@ -13,8 +13,13 @@ export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
-  findForCurrentUser(@CurrentUser() user: { id: string }, @Query('limit') limit?: string) {
-    return this.notificationsService.findForUser(user.id, limit);
+  findForCurrentUser(
+    @CurrentUser() user: { id: string },
+    @Query('limit') limit?: string,
+    @Query('category') category?: string,
+    @Query('unreadOnly') unreadOnly?: string,
+  ) {
+    return this.notificationsService.findForUser(user.id, limit, category, unreadOnly);
   }
 
   @Get('unread-count')
@@ -31,6 +36,13 @@ export class NotificationsController {
   getUnreadMessageActivityIds(@CurrentUser() user: { id: string }) {
     return this.notificationsService
       .getUnreadMessageActivityIds(user.id)
+      .then((activityIds) => ({ activityIds }));
+  }
+
+  @Get('unread-private-message-activity-ids')
+  getUnreadPrivateMessageActivityIds(@CurrentUser() user: { id: string }) {
+    return this.notificationsService
+      .getUnreadPrivateMessageActivityIds(user.id)
       .then((activityIds) => ({ activityIds }));
   }
 
@@ -71,8 +83,51 @@ export class NotificationsController {
   markMessagesReadByActivity(
     @Param('activityId', ParseObjectIdPipe) activityId: string,
     @CurrentUser() user: { id: string },
+    @Query('type') type?: 'general' | 'private',
+    @Query('actorId') actorId?: string,
   ) {
+    if (type === 'general') {
+      return this.notificationsService
+        .markGeneralMessagesReadByActivity(activityId, user.id)
+        .then(() => ({ ok: true }));
+    }
+
+    if (type === 'private' && actorId) {
+      return this.notificationsService
+        .markPrivateMessagesReadByActivityAndActor(activityId, user.id, actorId)
+        .then(() => ({ ok: true }));
+    }
+
     return this.notificationsService.markMessagesReadByActivity(activityId, user.id).then(() => ({ ok: true }));
+  }
+
+  @Patch('messages/mark-all-read')
+  markAllMessagesRead(@CurrentUser() user: { id: string }) {
+    return this.notificationsService.markAllMessagesRead(user.id).then(() => ({ ok: true }));
+  }
+
+  @Patch('messages/general/read-by-activity/:activityId')
+  @ApiParam({ name: 'activityId', description: 'ID de la actividad', type: String })
+  markGeneralMessagesReadByActivity(
+    @Param('activityId', ParseObjectIdPipe) activityId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.notificationsService
+      .markGeneralMessagesReadByActivity(activityId, user.id)
+      .then(() => ({ ok: true }));
+  }
+
+  @Patch('messages/private/read-by-activity/:activityId/actor/:actorId')
+  @ApiParam({ name: 'activityId', description: 'ID de la actividad', type: String })
+  @ApiParam({ name: 'actorId', description: 'ID del emisor de los mensajes privados', type: String })
+  markPrivateMessagesReadByActivityAndActor(
+    @Param('activityId', ParseObjectIdPipe) activityId: string,
+    @Param('actorId', ParseObjectIdPipe) actorId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.notificationsService
+      .markPrivateMessagesReadByActivityAndActor(activityId, user.id, actorId)
+      .then(() => ({ ok: true }));
   }
 
   @Patch(':id/read')

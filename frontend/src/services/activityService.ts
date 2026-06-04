@@ -1,6 +1,13 @@
 import { api } from './api';
 
-export type EntityReference = string | { _id?: string; id?: string; nombre?: string; email?: string; ciudad?: string } | null | undefined;
+export type EntityReference = string | {
+  _id?: string;
+  id?: string;
+  nombre?: string;
+  email?: string;
+  ciudad?: string;
+  fotoPerfilUrl?: string;
+} | null | undefined;
 
 export interface Activity {
   _id: string;

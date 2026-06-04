@@ -45,8 +45,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.data.userId = userId;
   }
 
-  handleDisconnect(_client: Socket) {
-    // rooms are cleaned up automatically by socket.io on disconnect
+  handleDisconnect(client: Socket) {
+    const userId: string | undefined = client.data.userId;
+    const activeActivityChats = (client.data.activeActivityChats ?? []) as string[];
+    const activePrivateChats = (client.data.activePrivateChats ?? []) as Array<{
+      activityId: string;
+      otherUserId: string;
+    }>;
+
+    if (userId) {
+      activeActivityChats.forEach((activityId) => {
+        void this.messagesService.markUserInactiveInGeneralChat(activityId, userId);
+      });
+      activePrivateChats.forEach(({ activityId, otherUserId }) => {
+        void this.privateMessagesService.markConversationInactive(activityId, otherUserId, userId);
+      });
+    }
   }
 
   // ─── General chat ─────────────────────────────────────────────────────────
@@ -67,15 +81,23 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     await client.join(`activity:${activityId}`);
     // Mark user as active (suppresses push notifications)
     await this.messagesService.markUserActiveInGeneralChat(activityId, userId);
+    const activeActivityChats = new Set<string>(client.data.activeActivityChats ?? []);
+    activeActivityChats.add(activityId);
+    client.data.activeActivityChats = [...activeActivityChats];
     return { ok: true };
   }
 
   @SubscribeMessage('leaveActivityChat')
-  handleLeaveActivityChat(
+  async handleLeaveActivityChat(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { activityId: string },
   ) {
+    const userId: string = client.data.userId;
     client.leave(`activity:${data.activityId}`);
+    await this.messagesService.markUserInactiveInGeneralChat(data.activityId, userId);
+    client.data.activeActivityChats = ((client.data.activeActivityChats ?? []) as string[]).filter(
+      (activityId) => activityId !== data.activityId,
+    );
     return { ok: true };
   }
 
@@ -125,17 +147,32 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     await client.join(room);
     // Mark viewer as active (suppresses push notifications)
     await this.privateMessagesService.markConversationActive(activityId, otherUserId, userId);
+    const activePrivateChats = (client.data.activePrivateChats ?? []) as Array<{
+      activityId: string;
+      otherUserId: string;
+    }>;
+    client.data.activePrivateChats = [
+      ...activePrivateChats.filter(
+        (chat) => chat.activityId !== activityId || chat.otherUserId !== otherUserId,
+      ),
+      { activityId, otherUserId },
+    ];
     return { ok: true };
   }
 
   @SubscribeMessage('leavePrivateChat')
-  handleLeavePrivateChat(
+  async handleLeavePrivateChat(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { activityId: string; otherUserId: string },
   ) {
     const userId: string = client.data.userId;
     const room = this.privateRoomName(data.activityId, userId, data.otherUserId);
     client.leave(room);
+    await this.privateMessagesService.markConversationInactive(data.activityId, data.otherUserId, userId);
+    client.data.activePrivateChats = ((client.data.activePrivateChats ?? []) as Array<{
+      activityId: string;
+      otherUserId: string;
+    }>).filter((chat) => chat.activityId !== data.activityId || chat.otherUserId !== data.otherUserId);
     return { ok: true };
   }
 

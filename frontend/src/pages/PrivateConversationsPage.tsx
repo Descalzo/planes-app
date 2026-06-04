@@ -6,7 +6,7 @@ import {
 } from '../services/privateActivityChatService';
 import { Activity, fetchActivity, getReferenceId, getReferenceName, isActivityCreator } from '../services/activityService';
 import { fetchCurrentUser } from '../services/authService';
-import { fetchUnreadPrivateMessageActorIds, markMessagesReadByActivity } from '../services/internalNotificationService';
+import { fetchUnreadPrivateMessageActorIds } from '../services/internalNotificationService';
 
 function formatDate(value?: string) {
   if (!value) return '';
@@ -55,13 +55,6 @@ export default function PrivateConversationsPage() {
           setActivity(activityData);
           setConversations(convData);
           setUnreadPrivateActorIds(new Set(actorIds));
-          // Marca todas las notificaciones de mensaje privado como leídas
-          markMessagesReadByActivity(currentActivityId)
-            .then(() => {
-              setUnreadPrivateActorIds(new Set());
-              window.dispatchEvent(new Event('planes:messages-changed'));
-            })
-            .catch(() => {});
           setError(null);
         }
       } catch {
